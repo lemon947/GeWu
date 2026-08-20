@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Building2, FlaskConical, GraduationCap, MapPinned, UsersRound } from 'lucide-react'
+import { Building2, Factory, FlaskConical, GraduationCap, MapPinned, UsersRound } from 'lucide-react'
+import { ecosystemGroups } from '../data/ecosystem'
 
 type Position = [number, number]
 
@@ -36,6 +37,13 @@ type CategoryDefinition = {
   shortTitle: string
   icon: typeof GraduationCap
   national: CommunityMetric
+}
+
+type ActorCard = {
+  key: CategoryKey
+  title: string
+  icon: typeof GraduationCap
+  features: string[]
 }
 
 const MAP_WIDTH = 760
@@ -88,12 +96,50 @@ const regionWeights: Record<string, number> = {
   陕西省: 0.044,
 }
 
+const highlightedRegions = ['北京市', '广东省', '上海市', '江苏省', '浙江省', '湖北省', '山东省', '四川省']
+
 const categoryWeights: Record<CategoryKey, number> = {
   university: 1,
   enterprise: 0.92,
   institute: 0.78,
   individual: 0.7,
 }
+
+const communityActorCards: ActorCard[] = [
+  {
+    key: 'university',
+    title: '高校',
+    icon: GraduationCap,
+    features: ['学科体系', '专家校验', '教学科研资源'],
+  },
+  {
+    key: 'enterprise',
+    title: '企业',
+    icon: Factory,
+    features: ['工具能力', '应用场景', '工程反馈'],
+  },
+  {
+    key: 'institute',
+    title: '新型研发机构',
+    icon: FlaskConical,
+    features: ['前沿项目', '实验数据', '协同攻关'],
+  },
+  {
+    key: 'individual',
+    title: '个人',
+    icon: UsersRound,
+    features: ['知识补充', '语料标注', '社区反馈'],
+  },
+]
+
+const communityPartners = Object.entries(ecosystemGroups).flatMap(([group, value]) => (
+  value.members.map((member) => ({ ...member, group }))
+))
+
+const partnerRows = [
+  communityPartners.slice(0, Math.ceil(communityPartners.length / 2)),
+  communityPartners.slice(Math.ceil(communityPartners.length / 2)),
+]
 
 function visitCoordinates(geometry: ProvinceGeometry, callback: (position: Position) => void) {
   const polygons = geometry.type === 'Polygon'
@@ -153,6 +199,25 @@ function geometryToPath(geometry: ProvinceGeometry, project: (position: Position
     .join(' ')
 }
 
+function getGeometryCenter(geometry: ProvinceGeometry): Position {
+  let minLongitude = Number.POSITIVE_INFINITY
+  let maxLongitude = Number.NEGATIVE_INFINITY
+  let minLatitude = Number.POSITIVE_INFINITY
+  let maxLatitude = Number.NEGATIVE_INFINITY
+
+  visitCoordinates(geometry, ([longitude, latitude]) => {
+    minLongitude = Math.min(minLongitude, longitude)
+    maxLongitude = Math.max(maxLongitude, longitude)
+    minLatitude = Math.min(minLatitude, latitude)
+    maxLatitude = Math.max(maxLatitude, latitude)
+  })
+
+  return [
+    (minLongitude + maxLongitude) / 2,
+    (minLatitude + maxLatitude) / 2,
+  ]
+}
+
 function stableHash(value: string) {
   return Array.from(value).reduce((hash, character) => ((hash * 31) + character.charCodeAt(0)) >>> 0, 7)
 }
@@ -208,20 +273,34 @@ export default function CorpusCommunity() {
     return namedFeatures.map((feature) => ({
       feature,
       path: geometryToPath(feature.geometry, project),
+      center: project(getGeometryCenter(feature.geometry)),
     }))
   }, [geoData])
+
+  const regionMarkers = useMemo(() => mapFeatures
+    .filter(({ feature }) => highlightedRegions.includes(feature.properties.name ?? ''))
+    .map(({ feature, center }) => {
+      const name = feature.properties.name ?? ''
+      const weight = regionWeights[name] ?? 0.04
+      return {
+        name,
+        center,
+        radius: 5 + weight * 44,
+      }
+    }), [mapFeatures])
 
   const visibleMetrics = useMemo(() => categoryDefinitions.map((definition) => ({
     ...definition,
     metric: activeProvince ? getProvinceMetric(activeProvince, definition) : definition.national,
   })), [activeProvince])
 
+  const actorFeatures = useMemo(() => new Map(communityActorCards.map((card) => [card.key, card.features])), [])
+
   return (
     <section className="corpus-community-section" aria-labelledby="community-title">
       <div className="community-section-inner">
         <header className="community-section-heading">
           <h2 id="community-title">数据社区 · 共建共享</h2>
-          <p>连接高校、企业、新型研发机构和个人贡献者，展现全国科学语料共建图景。</p>
         </header>
 
         <div className="community-layout">
@@ -235,11 +314,6 @@ export default function CorpusCommunity() {
                 <MapPinned size={18} />
                 <span>全国建设分布</span>
               </div>
-            </div>
-
-            <div className="community-map-status">
-              <span>当前查看</span>
-              <strong>{activeProvince ?? '全国'}</strong>
             </div>
 
             <div className="china-map-wrap">
@@ -285,6 +359,32 @@ export default function CorpusCommunity() {
                       />
                     )
                   })}
+                  {regionMarkers.map(({ name, center: [x, y], radius }) => {
+                    const isActive = activeProvince === name
+                    return (
+                      <g
+                        className={`province-marker${isActive ? ' is-active' : ''}`}
+                        key={name}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`查看${name}重点建设数据`}
+                        onMouseEnter={() => setActiveProvince(name)}
+                        onFocus={() => setActiveProvince(name)}
+                        onClick={() => setActiveProvince(name)}
+                        onBlur={() => setActiveProvince(null)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            setActiveProvince(name)
+                          }
+                        }}
+                      >
+                        <title>{name}</title>
+                        <circle className="marker-pulse" cx={x} cy={y} r={radius + 4} />
+                        <circle className="marker-core" cx={x} cy={y} r={radius} />
+                      </g>
+                    )
+                  })}
                 </svg>
               )}
             </div>
@@ -304,13 +404,19 @@ export default function CorpusCommunity() {
             </div>
 
             <div className="community-card-grid">
-              {visibleMetrics.map(({ key, title, shortTitle, icon: Icon, metric }) => {
+              {visibleMetrics.map(({ key, title, icon: Icon, metric }) => {
                 const formatted = formatMetric(metric)
+                const features = actorFeatures.get(key) ?? []
                 return (
                   <article className={`community-data-card category-${key}`} key={key}>
                     <header>
-                      <span className="community-category-icon"><Icon size={19} /></span>
-                      <div><small>{shortTitle}</small><h4>{title}</h4></div>
+                      <div className="community-data-title-row">
+                        <span className="community-category-icon"><Icon size={19} /></span>
+                        <h4>{title}</h4>
+                      </div>
+                      <div className="community-data-features" aria-label={`${title}建设特点`}>
+                        {features.map((feature) => <span key={feature}>{feature}</span>)}
+                      </div>
                     </header>
                     <dl>
                       <div><dt>语料集</dt><dd>{formatted.corpusSets}</dd></div>
@@ -324,11 +430,29 @@ export default function CorpusCommunity() {
           </aside>
         </div>
 
-        <footer className="community-data-note">
-          <span>机构所在省以注册机构地址为准</span>
-          <span>个人仅展示省级汇总数据，不展示精确位置和未授权个人信息</span>
-          <span>2026年7月10日 · 每月10日更新</span>
-        </footer>
+        <section className="community-partners-section" aria-labelledby="community-partners-title">
+          <header className="community-subsection-heading">
+            <h3 id="community-partners-title">共建伙伴</h3>
+          </header>
+          <div className="partner-marquee-stack" aria-label="语料共建方列表">
+            {partnerRows.map((row, index) => (
+              <div className={`partner-marquee-row ${index === 1 ? 'is-reverse' : ''}`} key={index}>
+                <div className="partner-marquee-track">
+                  {[...row, ...row].map((partner, partnerIndex) => (
+                    <div className="partner-logo-card" key={`${partner.name}-${partnerIndex}`} aria-hidden={partnerIndex >= row.length}>
+                      {partner.logo ? <img src={partner.logo} alt="" /> : <i>{partner.name.slice(0, 2)}</i>}
+                      <div>
+                        <strong>{partner.name}</strong>
+                        <span>{partner.group}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
       </div>
     </section>
   )

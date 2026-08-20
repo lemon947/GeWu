@@ -2,13 +2,7 @@ import { useState } from 'react'
 import { ArrowRight, Building2, GraduationCap, Microscope, Network, Sparkles, UserRound } from 'lucide-react'
 import { Link } from 'react-router'
 import LogoMark from '../components/LogoMark'
-
-type EcosystemKey = '高校' | '科研机构' | '企业' | '个人'
-
-type EcosystemMember = {
-  name: string
-  logo?: string
-}
+import { ecosystemGroups, type EcosystemKey } from '../data/ecosystem'
 
 const philosophyNodes = [
   { key: 'open', title: '开放协同', text: '汇聚高校、科研机构、企业和个人建设力量，形成多方参与、优势互补的语料建设机制', keywords: '多方参与 · 共建共享' },
@@ -17,49 +11,11 @@ const philosophyNodes = [
   { key: 'iteration', title: '持续迭代', text: '推动数据、工具、人才和模型协同演化，通过建设与使用反馈不断提升语料质量', keywords: '协同演化 · 持续更新' },
 ]
 
-const logo = (name: string) => `${import.meta.env.BASE_URL}images/partners/${name}`
-
-const ecosystemGroups: Record<EcosystemKey, { icon: typeof GraduationCap; summary: string; members: EcosystemMember[] }> = {
-  高校: {
-    icon: GraduationCap,
-    summary: '提供学科体系、专业人才与高质量学科语料',
-    members: [
-      { name: '北京大学', logo: logo('pku.svg') },
-      { name: '清华大学', logo: logo('tsinghua.webp') },
-      { name: '厦门大学', logo: logo('xiamen.jpg') },
-      { name: '南京大学', logo: logo('nanjing.webp') },
-      { name: '武汉大学', logo: logo('wuhan.webp') },
-      { name: '复旦大学', logo: logo('fudan.png') },
-      { name: '上海交通大学', logo: logo('sjtu.jpg') },
-    ],
-  },
-  科研机构: {
-    icon: Microscope,
-    summary: '汇聚科研数据、实验资源与前沿科学成果',
-    members: [
-      { name: '北京科学智能研究院', logo: logo('aisi.ico') },
-      { name: '鹏城实验室', logo: logo('pengcheng.jpeg') },
-    ],
-  },
-  企业: {
-    icon: Building2,
-    summary: '提供技术工具、数据资源与应用场景',
-    members: [
-      { name: '华为', logo: logo('huawei.jpeg') },
-      { name: '万方数据', logo: logo('wanfang.jpeg') },
-      { name: '深势科技', logo: logo('dptech.jpg') },
-      { name: '京能集团', logo: logo('jingneng.jpg') },
-      { name: '百度', logo: logo('baidu.jpeg') },
-      { name: '字节跳动', logo: logo('bytedance.jpeg') },
-      { name: '中国联通', logo: logo('unicom.jpeg') },
-      { name: '蚂蚁集团', logo: logo('ant.jpg') },
-    ],
-  },
-  个人: {
-    icon: UserRound,
-    summary: '贡献专业语料、领域知识与实际使用反馈',
-    members: ['教师', '科研人员', '学生', '专业技术人员', '公众贡献者'].map((name) => ({ name })),
-  },
+const ecosystemIcons: Record<EcosystemKey, typeof GraduationCap> = {
+  高校: GraduationCap,
+  科研机构: Microscope,
+  企业: Building2,
+  个人: UserRound,
 }
 
 export default function About() {
@@ -126,7 +82,7 @@ export default function About() {
             <div className="ecosystem-ring ring-a" aria-hidden="true" /><div className="ecosystem-ring ring-b" aria-hidden="true" /><div className="ecosystem-ring ring-c" aria-hidden="true" />
             <div className="ecosystem-ring-copy" aria-hidden="true">{['汇聚', '治理', '共享', '使用', '反馈', '迭代'].map((item) => <span key={item}>{item}</span>)}</div>
             <div className="ecosystem-core"><LogoMark size={66} /><strong>格物 · 科学语料库</strong><span>科学语料共建共享枢纽</span></div>
-            {(Object.keys(ecosystemGroups) as EcosystemKey[]).map((key) => { const group = ecosystemGroups[key]; const Icon = group.icon; return <button type="button" key={key} className={`ecosystem-group-node group-${key === '高校' ? 'university' : key === '科研机构' ? 'research' : key === '企业' ? 'enterprise' : 'individual'}${activeGroup === key ? ' is-active' : ''}`} onMouseEnter={() => setActiveGroup(key)} onFocus={() => setActiveGroup(key)} onClick={() => setActiveGroup(key)}><Icon size={22} /><strong>{key}</strong><small>{group.summary}</small></button> })}
+            {(Object.keys(ecosystemGroups) as EcosystemKey[]).map((key) => { const group = ecosystemGroups[key]; const Icon = ecosystemIcons[key]; return <button type="button" key={key} className={`ecosystem-group-node group-${key === '高校' ? 'university' : key === '科研机构' ? 'research' : key === '企业' ? 'enterprise' : 'individual'}${activeGroup === key ? ' is-active' : ''}`} onMouseEnter={() => setActiveGroup(key)} onFocus={() => setActiveGroup(key)} onClick={() => setActiveGroup(key)}><Icon size={22} /><strong>{key}</strong><small>{group.summary}</small></button> })}
             <div className="ecosystem-member-panel">
               <div><span>{activeGroup}</span><strong>{active.summary}</strong></div>
               <div className={`ecosystem-member-list is-${activeGroup === '高校' ? 'university' : 'standard'}`}>

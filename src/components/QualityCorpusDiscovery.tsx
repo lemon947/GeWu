@@ -105,7 +105,6 @@ function sortCorpus(items: CorpusItem[], sortKey: SortKey) {
 
 export default function QualityCorpusDiscovery() {
   const [activeTab, setActiveTab] = useState<SortKey>('latest')
-  const activeDefinition = tabDefinitions.find((tab) => tab.key === activeTab) ?? tabDefinitions[0]
   const visibleCorpus = useMemo(() => sortCorpus(corpusItems, activeTab).slice(0, 6), [activeTab])
 
   return (
@@ -137,8 +136,6 @@ export default function QualityCorpusDiscovery() {
           </Link>
         </div>
 
-        <p className="discovery-sort-description">{activeDefinition.description}</p>
-
         <div
           className="quality-corpus-grid"
           id="quality-corpus-panel"
@@ -147,6 +144,19 @@ export default function QualityCorpusDiscovery() {
         >
           {visibleCorpus.map((item) => (
             <Link className="quality-corpus-card" to={`/search/datasets/${item.id}`} key={item.id}>
+              <div className="quality-card-visual" aria-hidden="true">
+                <span className="visual-line visual-line-one" />
+                <span className="visual-line visual-line-two" />
+                <span className="visual-node node-one" />
+                <span className="visual-node node-two" />
+                <span className="visual-node node-three" />
+                <span className="visual-node node-four" />
+                <span className="visual-bar bar-one" />
+                <span className="visual-bar bar-two" />
+                <span className="visual-bar bar-three" />
+                <span className="visual-bar bar-four" />
+              </div>
+
               <div className="quality-card-tags">
                 <span className="domain-tag">{item.domain}</span>
                 <span>{item.type}</span>

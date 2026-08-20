@@ -1,15 +1,22 @@
-import { Search, UploadCloud } from 'lucide-react'
+import {
+  Bookmark,
+  CloudUpload,
+  Compass,
+  Database,
+  Edit3,
+  Heart,
+  HeartHandshake,
+  MessageCircle,
+  Search,
+  UploadCloud,
+  UsersRound,
+  Wrench,
+} from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import { useApp } from '../context/app-context'
 import CorpusCommunity from '../components/CorpusCommunity'
 import SubjectShowcase from '../components/SubjectShowcase'
 import QualityCorpusDiscovery from '../components/QualityCorpusDiscovery'
-import multiPartyImage from '../assets/capabilities/multi-party.png'
-import governanceImage from '../assets/capabilities/governance.png'
-import discoveryImage from '../assets/capabilities/discovery.png'
-import processingImage from '../assets/capabilities/processing.png'
-import trustedUseImage from '../assets/capabilities/trusted-use.png'
-import iterationImage from '../assets/capabilities/iteration.png'
 
 const metrics = [
   { value: '92亿条', label: '语料条数' },
@@ -25,47 +32,119 @@ const evolutionItems = [
   { key: 'model', mark: '智', title: '模型', detail: '智能模型' },
 ]
 
-const platformCapabilities = [
+type PlatformCapabilityKey = 'search' | 'discovery' | 'tools' | 'upload' | 'demand'
+
+const platformCapabilities: Array<{
+  key: PlatformCapabilityKey
+  title: string
+  description: string
+  icon: typeof Database
+}> = [
   {
-    key: 'contribute',
-    title: '多方汇聚',
-    description: '连接高校、科研机构、企业和个人，持续汇交科学语料',
-    image: multiPartyImage,
-    to: '/upload',
+    key: 'search',
+    title: '语料检索',
+    description: '精准发现科学语料',
+    icon: Database,
   },
   {
-    key: 'govern',
-    title: '规范治理',
-    description: '统一分类与权益记录，保障语料全流程可追溯',
-    image: governanceImage,
+    key: 'discovery',
+    title: '语料发现',
+    description: '最新优质成果内容',
+    icon: Compass,
   },
   {
-    key: 'discover',
-    title: '精准发现',
-    description: '通过多维检索、在线预览和筛选快速定位所需语料',
-    image: discoveryImage,
-    to: '/search',
+    key: 'upload',
+    title: '语料上传',
+    description: '开放汇交·持续共建',
+    icon: CloudUpload,
   },
   {
-    key: 'process',
-    title: '专业加工',
-    description: '复用专业工具链，支持多模态处理、标注、对齐与评估',
-    image: processingImage,
-    to: '/tools',
+    key: 'demand',
+    title: '需求广场',
+    description: '需求-语料相匹配',
+    icon: HeartHandshake,
   },
   {
-    key: 'use',
-    title: '可信使用',
-    description: '提供分级开放与权限管理，兼顾共享、权益和安全合规',
-    image: trustedUseImage,
-  },
-  {
-    key: 'iterate',
-    title: '协同迭代',
-    description: '连接贡献、使用与管理，以应用反馈推动持续更新',
-    image: iterationImage,
+    key: 'tools',
+    title: '工具市场',
+    description: '专业加工工具',
+    icon: Wrench,
   },
 ]
+
+const demandCards = [
+  {
+    title: '分子-工艺-性能构效关系预测与逆向设计',
+    meta: '化学化工 · 基地材料',
+    tags: ['科学数据', '知识语料'],
+    summary: '需要分子的组成、理化性质与合成工艺数据，包含 CAS 号、分子结构、SMILES、InChI 及工艺参数。',
+    likes: 24,
+    comments: 8,
+    bookmarks: 5,
+  },
+  {
+    title: '组合数学、数论的形式化知识',
+    meta: '基地数学 · 数学物理',
+    tags: ['数学定理证明', '知识语料'],
+    summary: '包含问题自然语言描述、Lean 形式化描述、Lean header 与证明 COT 等。',
+    likes: 18,
+    comments: 6,
+    bookmarks: 4,
+  },
+  {
+    title: 'CMIP6 全球气候模型数据',
+    meta: '地球 · 科学数据库',
+    tags: ['CMIP6', 'NetCDF'],
+    summary: '全量气候模型输出数据，覆盖大气、海洋与陆地变量，遵循 CF 元数据规范。',
+    likes: 36,
+    comments: 12,
+    bookmarks: 9,
+  },
+]
+
+function CapabilityMotion({ type }: { type: PlatformCapabilityKey }) {
+  if (type === 'search') {
+    return (
+      <div className="capability-motion motion-search" aria-hidden="true">
+        <Database size={76} />
+        <span className="database-node node-one" />
+        <span className="database-node node-two" />
+        <span className="database-node node-three" />
+        <span className="scan-line" />
+      </div>
+    )
+  }
+
+  if (type === 'upload') {
+    return (
+      <div className="capability-motion motion-upload" aria-hidden="true">
+        <CloudUpload size={78} />
+        <span className="upload-block block-one" />
+        <span className="upload-block block-two" />
+        <span className="upload-arrow" />
+      </div>
+    )
+  }
+
+  if (type === 'demand') {
+    return (
+      <div className="capability-motion motion-demand" aria-hidden="true">
+        <HeartHandshake size={80} />
+        <span className="orbit-path" />
+        <span className="orbit-dot" />
+      </div>
+    )
+  }
+
+  const Icon = platformCapabilities.find((item) => item.key === type)?.icon ?? Compass
+  return (
+    <div className={`capability-motion motion-${type}`} aria-hidden="true">
+      <Icon size={80} />
+      <span className="pulse-ring ring-one" />
+      <span className="pulse-ring ring-two" />
+    </div>
+  )
+}
 
 export default function Home() {
   const navigate = useNavigate()
@@ -133,33 +212,72 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="platform-capabilities-section">
-        <div className="platform-capabilities-container">
-          <header className="platform-capabilities-heading">
-            <h2>平台能力</h2>
-            <p>贯通科学语料汇聚、治理、加工、发现、使用与迭代，连接语料建设成果与科研应用</p>
-          </header>
+      <section className="demand-plaza-section" aria-labelledby="demand-plaza-title">
+        <div className="demand-plaza-inner">
+          <div className="demand-plaza-copy">
+            <span>需求广场</span>
+            <h2 id="demand-plaza-title">让每一个语料需求<br />被看见、被响应</h2>
+            <p>发布语料库建设需求，通过回复、点赞与评论，让好想法汇聚成可落地的共建项目。</p>
+            <div className="demand-plaza-actions" aria-label="需求广场协作流程">
+              <div><Edit3 size={24} /><strong>发布需求</strong></div>
+              <i aria-hidden="true" />
+              <div><UsersRound size={24} /><strong>寻找伙伴</strong></div>
+              <i aria-hidden="true" />
+              <div><HeartHandshake size={24} /><strong>协作共建</strong></div>
+            </div>
+          </div>
 
-          <div className="platform-capabilities-grid">
-            {platformCapabilities.map((capability) => {
-              const content = (
-                <>
-                  <img src={capability.image} alt="" aria-hidden="true" />
-                  <h3>{capability.title}</h3>
-                  <p>{capability.description}</p>
-                </>
-              )
-
-              return capability.to
-                ? <Link className={`platform-capability-card capability-${capability.key}`} to={capability.to} key={capability.key}>{content}</Link>
-                : <article className={`platform-capability-card capability-${capability.key}`} key={capability.key}>{content}</article>
-            })}
+          <div className="demand-card-stage" aria-label="需求广场示例需求">
+            <span className="demand-orbit orbit-one" />
+            <span className="demand-orbit orbit-two" />
+            <span className="demand-orbit-dot dot-one" />
+            <span className="demand-orbit-dot dot-two" />
+            <span className="demand-orbit-dot dot-three" />
+            {demandCards.map((item, index) => (
+              <article className={`demand-preview-card card-${index + 1}`} key={item.title}>
+                <div className="demand-avatar" aria-hidden="true"><span /></div>
+                <div className="demand-preview-content">
+                  <h3>{item.title}</h3>
+                  <p className="demand-preview-meta">{item.meta}</p>
+                  <div className="demand-preview-tags">
+                    {item.tags.map((tag) => <span key={tag}>{tag}</span>)}
+                  </div>
+                  <p>{item.summary}</p>
+                  <footer>
+                    <span><Heart size={16} />{item.likes}</span>
+                    <span><MessageCircle size={16} />{item.comments}</span>
+                    <span><Bookmark size={16} />{item.bookmarks}</span>
+                  </footer>
+                </div>
+              </article>
+            ))}
+            <Link className="demand-plaza-link" to="/search">
+              进入需求广场 <span aria-hidden="true">→</span>
+            </Link>
           </div>
         </div>
       </section>
 
-      <CorpusCommunity />
+      <section className="platform-capabilities-section">
+        <div className="platform-capabilities-container">
+          <header className="platform-capabilities-heading">
+            <h2>连接科学语料的每一步</h2>
+          </header>
+
+          <div className="platform-flow-card-row" aria-label="平台能力列表">
+            {platformCapabilities.map((capability) => (
+              <article className={`platform-flow-card card-${capability.key}`} key={capability.key}>
+                <CapabilityMotion type={capability.key} />
+                <h3>{capability.title}</h3>
+                <p>{capability.description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <SubjectShowcase />
+      <CorpusCommunity />
       <QualityCorpusDiscovery />
     </div>
   )
