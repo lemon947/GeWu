@@ -67,8 +67,6 @@ const institutionGroups: InstitutionGroup[] = [
       { label: '其他', count: 8, custom: true },
     ],
   },
-  { label: '企业', count: 72, children: [{ label: '深势科技', count: 64 }, { label: '其他', count: 8, custom: true }] },
-  { label: '新型研发机构', count: 49, children: [{ label: '北京科学智能研究院', count: 44 }, { label: '其他', count: 5, custom: true }] },
   { label: '个人', count: 37, children: [] },
 ]
 
@@ -132,6 +130,27 @@ function ExpandButton({ visible, total, onExpand, onCollapse }: { visible: numbe
   return <button type="button" className="facet-expand" onClick={onCollapse}>收起<ChevronUp size={14} /></button>
 }
 
+function FacetTitle({
+  title,
+  expanded,
+  onToggle,
+}: {
+  title: string
+  expanded: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="facet-title">
+      <h3>{title}</h3>
+      <div className="facet-title-actions">
+        <button type="button" className="facet-title-toggle" onClick={onToggle} aria-expanded={expanded} aria-label={`${expanded ? '收起' : '展开'}${title}`}>
+          {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function CorpusFilterSidebar({
   initialSubject = '',
   initialPublisher = '',
@@ -148,13 +167,15 @@ export default function CorpusFilterSidebar({
   onInitialFilterCleared?: (type: 'subject' | 'publisher') => void
 }) {
   const [filters, setFilters] = useState(() => emptyFilters(initialSubject, initialPublisher))
-  const [subjectVisible, setSubjectVisible] = useState(5)
+  const [subjectVisible, setSubjectVisible] = useState(6)
+  const [subjectExpanded, setSubjectExpanded] = useState(true)
   const [institutionQuery, setInstitutionQuery] = useState('')
+  const [institutionExpanded, setInstitutionExpanded] = useState(true)
   const [openInstitutionGroups, setOpenInstitutionGroups] = useState<string[]>(() => {
     const group = initialInstitutionGroup(initialPublisher)
-    return group ? [group] : []
+    return group ? [group] : ['高校']
   })
-  const [institutionVisible, setInstitutionVisible] = useState<Record<string, number>>({ 高校: 5, 企业: 5, 新型研发机构: 5 })
+  const [institutionVisible, setInstitutionVisible] = useState<Record<string, number>>({ 高校: 5 })
   const [openInstitutionNodes, setOpenInstitutionNodes] = useState<string[]>(() => {
     if (initialPublisher === '北京大学' || pkuDepartments.some((item) => item.label === initialPublisher)) return ['高校/北京大学']
     return []
@@ -265,10 +286,12 @@ export default function CorpusFilterSidebar({
 
   const resetAll = () => {
     setFilters(emptyFilters())
-    setSubjectVisible(5)
+    setSubjectVisible(6)
+    setSubjectExpanded(true)
     setInstitutionQuery('')
-    setOpenInstitutionGroups([])
-    setInstitutionVisible({ 高校: 5, 企业: 5, 新型研发机构: 5 })
+    setInstitutionExpanded(true)
+    setOpenInstitutionGroups(['高校'])
+    setInstitutionVisible({ 高校: 5 })
     setOpenInstitutionNodes([])
     setInstitutionNodeVisible({ '高校/北京大学': 5 })
     setCustomInstitutionEnabled([])
@@ -282,6 +305,30 @@ export default function CorpusFilterSidebar({
     if (group === 'subjects' && value === initialSubject) onInitialFilterCleared?.('subject')
     if (group === 'institutions' && (value === initialPublisher || initialPublisher === '北京大学' && pkuDepartments.some((item) => item.label === value))) {
       onInitialFilterCleared?.('publisher')
+    }
+    if (group === 'subjects') {
+      const children = subjectChildren[value]?.map((item) => item.label) ?? []
+      setFilters((current) => ({
+        ...current,
+        subjects: current.subjects.filter((item) => item !== value),
+        subSubjects: current.subSubjects.filter((item) => !children.includes(item)),
+      }))
+      return
+    }
+    if (group === 'subSubjects') {
+      const parent = Object.entries(subjectChildren).find(([, children]) => children.some((child) => child.label === value))?.[0]
+      setFilters((current) => {
+        const nextSubSubjects = current.subSubjects.filter((item) => item !== value)
+        if (!parent) return { ...current, subSubjects: nextSubSubjects }
+        const parentChildren = subjectChildren[parent].map((item) => item.label)
+        const hasAny = nextSubSubjects.some((item) => parentChildren.includes(item))
+        return {
+          ...current,
+          subSubjects: nextSubSubjects,
+          subjects: hasAny ? current.subjects : current.subjects.filter((item) => item !== parent),
+        }
+      })
+      return
     }
     update(group, filters[group].filter((item) => item !== value))
     if (group === 'institutions') {
@@ -297,7 +344,7 @@ export default function CorpusFilterSidebar({
   return (
     <aside className="corpus-filter-sidebar" aria-label="语料筛选条件">
       <section className="applied-filter-panel">
-        <div className="facet-panel-heading"><h2>已应用筛选</h2><button type="button" onClick={resetAll}><RotateCcw size={13} />重置</button></div>
+        <div className="facet-panel-heading"><h2>已应用筛选区</h2><button type="button" onClick={resetAll}><RotateCcw size={13} />重置</button></div>
         <div className="applied-filter-tags">
           {totalApplied === 0 && <p>暂未应用筛选条件</p>}
           {externalTags.map((tag) => <button type="button" key={tag.id} onClick={tag.onRemove}>{tag.label}<X size={12} /></button>)}
@@ -310,27 +357,29 @@ export default function CorpusFilterSidebar({
       </section>
 
       <section className="facet-section">
-        <div className="facet-title"><h3>学科领域</h3><span>{subjectOptions.reduce((sum, item) => sum + item.count, 0)}</span></div>
-        {subjectOptions.slice(0, subjectVisible).map((option) => (
-          <div key={option.label}>
-            <OptionRow option={option} checked={filters.subjects.includes(option.label)} onChange={() => toggleSubject(option.label)} />
-            {filters.subjects.includes(option.label) && subjectChildren[option.label] && (
-              <div className="nested-facet-list">
-                {subjectChildren[option.label].map((child) => <OptionRow key={child.label} option={child} nested checked={filters.subSubjects.includes(child.label)} onChange={() => toggleSubSubject(option.label, child.label)} />)}
-              </div>
-            )}
-          </div>
-        ))}
-        <ExpandButton visible={subjectVisible} total={subjectOptions.length} onExpand={() => setSubjectVisible((value) => Math.min(value + 5, subjectOptions.length))} onCollapse={() => setSubjectVisible(5)} />
+        <FacetTitle title="学科领域" expanded={subjectExpanded} onToggle={() => setSubjectExpanded((value) => !value)} />
+        {subjectExpanded && <>
+          {subjectOptions.slice(0, subjectVisible).map((option) => (
+            <div key={option.label}>
+              <OptionRow option={option} checked={filters.subjects.includes(option.label)} onChange={() => toggleSubject(option.label)} />
+              {filters.subjects.includes(option.label) && subjectChildren[option.label] && (
+                <div className="nested-facet-list">
+                  {subjectChildren[option.label].map((child) => <OptionRow key={child.label} option={child} nested checked={filters.subSubjects.includes(child.label)} onChange={() => toggleSubSubject(option.label, child.label)} />)}
+                </div>
+              )}
+            </div>
+          ))}
+        </>}
       </section>
 
-      <SimpleFacet title="语料类型" total={802} options={corpusTypeOptions} selected={filters.corpusTypes} onToggle={(value) => update('corpusTypes', toggleValue(filters.corpusTypes, value))} />
-      <SimpleFacet title="开放程度" total={900} options={opennessOptions} selected={filters.openness} onToggle={(value) => update('openness', toggleValue(filters.openness, value))} />
+      <SimpleFacet title="语料类型" options={corpusTypeOptions} selected={filters.corpusTypes} onToggle={(value) => update('corpusTypes', toggleValue(filters.corpusTypes, value))} />
+      <SimpleFacet title="开放程度" options={opennessOptions} selected={filters.openness} onToggle={(value) => update('openness', toggleValue(filters.openness, value))} />
 
       <section className="facet-section institution-facet">
-        <div className="facet-title"><h3>发布机构</h3><span>900</span></div>
-        <label className="institution-search"><Search size={14} /><input value={institutionQuery} onChange={(event) => setInstitutionQuery(event.target.value)} placeholder="搜索发布机构" /></label>
-        {institutionGroups.map((group) => {
+        <FacetTitle title="发布机构" expanded={institutionExpanded} onToggle={() => setInstitutionExpanded((value) => !value)} />
+        {institutionExpanded && <>
+          <label className="institution-search"><Search size={14} /><input value={institutionQuery} onChange={(event) => setInstitutionQuery(event.target.value)} placeholder="搜索发布机构" /></label>
+          {institutionGroups.map((group) => {
           const query = institutionQuery.trim()
           const groupLabelMatches = Boolean(query && group.label.includes(query))
           const matchingNodes = !query || groupLabelMatches ? group.children : group.children.filter((node) => node.label.includes(query) || node.children?.some((child) => child.label.includes(query)))
@@ -407,21 +456,25 @@ export default function CorpusFilterSidebar({
             </div>
           )
         })}
+        </>}
       </section>
 
-      <SimpleFacet title="语料规模" total={900} options={corpusSizeOptions} selected={filters.corpusSizes} onToggle={(value) => update('corpusSizes', toggleValue(filters.corpusSizes, value))} />
-      <SimpleFacet title="存储容量" total={900} options={storageOptions} selected={filters.storageSizes} onToggle={(value) => update('storageSizes', toggleValue(filters.storageSizes, value))} />
+      <SimpleFacet title="语料规模" options={corpusSizeOptions} selected={filters.corpusSizes} onToggle={(value) => update('corpusSizes', toggleValue(filters.corpusSizes, value))} />
+      <SimpleFacet title="存储容量" options={storageOptions} selected={filters.storageSizes} onToggle={(value) => update('storageSizes', toggleValue(filters.storageSizes, value))} />
     </aside>
   )
 }
 
-function SimpleFacet({ title, total, options, selected, onToggle }: { title: string; total: number; options: Option[]; selected: string[]; onToggle: (value: string) => void }) {
+function SimpleFacet({ title, options, selected, onToggle }: { title: string; options: Option[]; selected: string[]; onToggle: (value: string) => void }) {
   const [visible, setVisible] = useState(5)
+  const [expanded, setExpanded] = useState(true)
   return (
     <section className="facet-section">
-      <div className="facet-title"><h3>{title}</h3><span>{total}</span></div>
-      {options.slice(0, visible).map((option) => <OptionRow key={option.label} option={option} checked={selected.includes(option.label)} onChange={() => onToggle(option.label)} />)}
-      <ExpandButton visible={visible} total={options.length} onExpand={() => setVisible((value) => Math.min(value + 5, options.length))} onCollapse={() => setVisible(5)} />
+      <FacetTitle title={title} expanded={expanded} onToggle={() => setExpanded((value) => !value)} />
+      {expanded && <>
+        {options.slice(0, visible).map((option) => <OptionRow key={option.label} option={option} checked={selected.includes(option.label)} onChange={() => onToggle(option.label)} />)}
+        <ExpandButton visible={visible} total={options.length} onExpand={() => setVisible((value) => Math.min(value + 5, options.length))} onCollapse={() => setVisible(5)} />
+      </>}
     </section>
   )
 }

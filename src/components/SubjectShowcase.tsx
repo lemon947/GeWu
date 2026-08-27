@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Atom,
-  Building2,
   CalendarDays,
   Calculator,
   Database,
+  Download,
   Dna,
   Earth,
   FlaskConical,
   HardDrive,
+  Eye,
   Layers3,
   Sparkles,
+  Star,
   Telescope,
 } from 'lucide-react'
 
@@ -292,6 +294,20 @@ const subjectFeatureSlides: Record<string, typeof mathFeatureSlides> = {
   ],
 }
 
+function featureMetrics(index: number) {
+  return {
+    views: [231, 468, 352, 586, 421, 319][index % 6],
+    favorites: [120, 156, 94, 211, 137, 88][index % 6],
+    downloads: [653, 428, 286, 714, 339, 196][index % 6],
+  }
+}
+
+function opennessLabel(openness: string) {
+  if (openness === '开放共享') return '全部公开'
+  if (openness === '不公开' || openness === '暂不开放') return '不公开'
+  return '部分公开'
+}
+
 const subjectData = [
   {
     name: '数学',
@@ -409,6 +425,7 @@ export default function SubjectShowcase() {
               {featureSlides.map((feature, index) => (
                 <article className={index === activeFeature ? 'is-active' : ''} key={feature.title}>
                   <div className="subject-carousel-art" aria-hidden="true">
+                    <span className={`card-status-overlay ${opennessLabel(feature.openness) === '全部公开' ? 'is-open' : opennessLabel(feature.openness) === '不公开' ? 'is-closed' : 'is-partial'}`}>{opennessLabel(feature.openness)}</span>
                     <span className="subject-art-line line-one" />
                     <span className="subject-art-line line-two" />
                     <span className="subject-art-node node-one" />
@@ -419,14 +436,21 @@ export default function SubjectShowcase() {
                     <span className="subject-art-bar bar-two" />
                     <span className="subject-art-bar bar-three" />
                   </div>
-                  <div className="subject-carousel-tags">
-                    {feature.tags.map((tag) => <small key={tag}>{tag}</small>)}
-                    <small className="openness-tag">{feature.openness}</small>
+                  <div className="subject-carousel-meta-row">
+                    <div className="subject-carousel-tags">
+                      {feature.tags.slice(0, 2).map((tag) => <small key={tag}>{tag}</small>)}
+                    </div>
+                    <time dateTime={feature.publishedAt}><CalendarDays size={14} />{feature.publishedAt}</time>
                   </div>
                   <h4>{feature.title}</h4>
-                  <div className="subject-carousel-org"><Building2 size={16} /><span>{feature.organization}</span></div>
                   <p>{feature.detail}</p>
-                  <footer><CalendarDays size={15} />{feature.publishedAt}</footer>
+                  <footer>
+                    <span className="card-org-mark" aria-hidden="true">北</span>
+                    <strong className="card-organization-name">{feature.organization}</strong>
+                    <span><Download size={14} />{featureMetrics(index).downloads}</span>
+                    <span><Eye size={14} />{featureMetrics(index).views}</span>
+                    <span><Star size={14} />{featureMetrics(index).favorites}</span>
+                  </footer>
                 </article>
               ))}
             </div>

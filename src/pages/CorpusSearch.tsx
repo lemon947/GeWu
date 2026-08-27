@@ -4,15 +4,14 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Database,
   Download,
   Eye,
-  Heart,
   Minus,
   Plus,
   RotateCcw,
   Search,
   SlidersHorizontal,
+  Star,
   X,
 } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
@@ -63,6 +62,10 @@ const fieldOptions: Array<{ value: SearchField; label: string }> = [
   { value: 'organization', label: '发布机构' },
   { value: 'author', label: '作者姓名' },
 ]
+
+function placeholderForField(field: SearchField) {
+  return `请输入${fieldOptions.find((option) => option.value === field)?.label ?? '检索内容'}`
+}
 
 const searchableSubjects = ['数学', '物理', '化学', '天文', '地理', '生物']
 const searchableInstitutions = [
@@ -193,6 +196,46 @@ function loadSearchHistory() {
   } catch {
     return [] as string[]
   }
+}
+
+function SearchHistoryPanel({
+  history,
+  onPick,
+  onDelete,
+  onClear,
+}: {
+  history: string[]
+  onPick: (keyword: string) => void
+  onDelete: (keyword: string) => void
+  onClear: () => void
+}) {
+  if (history.length === 0) return null
+  return (
+    <div className="search-history-panel">
+      <div className="search-history-heading">
+        <strong>最近检索</strong>
+        <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={onClear}>清空</button>
+      </div>
+      <ul>
+        {history.map((keyword) => (
+          <li key={keyword}>
+            <button type="button" className="history-keyword" onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(keyword)}>
+              {keyword}
+            </button>
+            <button
+              type="button"
+              className="history-remove"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onDelete(keyword)}
+              aria-label={`删除历史检索词${keyword}`}
+            >
+              <X size={13} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
 
 function valueForField(item: CorpusRecord, field: SearchField) {
@@ -413,6 +456,11 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
     setHistoryOpen(false)
   }
 
+  const applySimpleHistoryKeyword = (keyword: string) => {
+    setSimpleKeyword(keyword)
+    setHistoryOpen(false)
+  }
+
   const filteredRecords = useMemo(() => {
     const matched = corpusRecords.filter((item, index) => {
       if (facetFilters.subjects.length && !facetFilters.subjects.includes(item.subject)) return false
@@ -475,18 +523,12 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
   const externalFilterTags = useMemo<ExternalFilterTag[]>(() => {
     const tags: ExternalFilterTag[] = []
     if (appliedSearch.mode === 'simple' && appliedSearch.simpleKeyword) {
-      const mapped = mappedFiltersFromSearch(appliedSearch)
-      const representedBySidebar = appliedSearch.simpleField === 'subject' && mapped.subject
-        || appliedSearch.simpleField === 'organization' && mapped.publisher
-      if (representedBySidebar) return tags
       const fieldLabel = fieldOptions.find((option) => option.value === appliedSearch.simpleField)?.label ?? '检索内容'
       tags.push({ id: 'simple-query', label: `${fieldLabel}：${appliedSearch.simpleKeyword}`, onRemove: () => setAppliedSearch(emptyAppliedSearch()) })
     }
     if (appliedSearch.mode === 'advanced') {
-      const mapped = mappedFiltersFromSearch(appliedSearch)
       appliedSearch.conditions.forEach((condition) => {
         if (!condition.value) return
-        if (condition.field === 'subject' && mapped.subject || condition.field === 'organization' && mapped.publisher) return
         const fieldLabel = fieldOptions.find((option) => option.value === condition.field)?.label ?? '检索内容'
         tags.push({
           id: `condition-${condition.id}`,
@@ -537,8 +579,7 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
     <main className="search-page">
       <header className={`search-page-heading${isResultsPage ? ' is-results' : ''}`}>
         {isResultsPage && <Link className="back-to-search" to="/search"><ChevronLeft size={15} />返回语料检索</Link>}
-        <h1>{isResultsPage ? '语料检索结果' : '语料检索'}</h1>
-        <p>{isResultsPage ? '通过筛选条件进一步定位所需科学语料资源' : '面向科学语料的一站式检索入口，快速定位可用于科研、教学与模型训练的语料资源。'}</p>
+        <h1>{isResultsPage ? '检索结果' : '语料检索'}</h1>
       </header>
 
       {!isResultsPage && <>
@@ -556,14 +597,22 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
           <form className="simple-search-form" action="/search/results" method="get" onSubmit={handleSimpleSearch}>
             <input type="hidden" name="search" value="simple" />
             <label>
-              <span>检索字段</span>
               <select name="field" value={simpleField} onChange={(event) => setSimpleField(event.target.value as SearchField)} aria-label="选择检索字段">
                 {fieldOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
               </select>
             </label>
             <label className="simple-query-field">
-              <span>检索内容</span>
-              <input name="q" value={simpleKeyword} onChange={(event) => setSimpleKeyword(event.target.value)} placeholder="请输入语料标题、关键词或相关信息" />
+              <input
+                name="q"
+                value={simpleKeyword}
+                onChange={(event) => setSimpleKeyword(event.target.value)}
+                onFocus={() => searchHistory.length > 0 && setHistoryOpen(true)}
+                onBlur={() => window.setTimeout(() => setHistoryOpen(false), 160)}
+                placeholder={placeholderForField(simpleField)}
+              />
+              {historyOpen && searchHistory.length > 0 && (
+                <SearchHistoryPanel history={searchHistory} onPick={applySimpleHistoryKeyword} onDelete={deleteHistoryItem} onClear={clearSearchHistory} />
+              )}
             </label>
             <button className="primary-search-button" type="submit"><Search size={18} />检索</button>
           </form>
@@ -620,9 +669,8 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
         {!isResultsPage && (
         <div className="catalog-results-heading">
           <div>
-            <span><Database size={17} />语料目录</span>
             <h2 id="catalog-results-title">全部语料</h2>
-            <p>共找到 <strong>{filteredRecords.length}</strong> 个符合条件的语料库</p>
+            <p>共900个语料库</p>
           </div>
           <label className="catalog-sort-control">
             <span>排序方式</span>
@@ -653,26 +701,15 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
               {fieldOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
             </select>
             <div className="result-search-input-wrap">
-              <Search size={17} />
               <input
                 value={resultSearchKeyword}
                 onChange={(event) => setResultSearchKeyword(event.target.value)}
                 onFocus={() => searchHistory.length > 0 && setHistoryOpen(true)}
                 onBlur={() => window.setTimeout(() => setHistoryOpen(false), 160)}
-                placeholder="搜索您感兴趣的语料"
+                placeholder={placeholderForField(resultSearchField)}
               />
               {historyOpen && searchHistory.length > 0 && (
-                <div className="result-search-history">
-                  <div><strong>最近检索</strong><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={clearSearchHistory}>清空</button></div>
-                  <ul>
-                    {searchHistory.map((keyword) => (
-                      <li key={keyword}>
-                        <button type="button" className="history-keyword" onMouseDown={(event) => event.preventDefault()} onClick={() => applyResultSimpleSearch(keyword)}>{keyword}</button>
-                        <button type="button" className="history-remove" onMouseDown={(event) => event.preventDefault()} onClick={() => deleteHistoryItem(keyword)} aria-label={`删除历史检索词${keyword}`}><X size={13} /></button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <SearchHistoryPanel history={searchHistory} onPick={applyResultSimpleSearch} onDelete={deleteHistoryItem} onClear={clearSearchHistory} />
               )}
             </div>
             <button type="submit" className="result-search-submit">检索</button>
@@ -704,16 +741,25 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
               const cardTarget = `/search/datasets/${item.id}`
               return (
               <Link className="catalog-corpus-card" to={cardTarget} target="_blank" rel="noreferrer" key={item.id}>
-                <div className="catalog-card-topline">
+                <div className="quality-card-visual catalog-card-visual" aria-hidden="true">
+                  <span className={`card-status-overlay ${displayMeta.opennessLabel === '全部公开' ? 'is-open' : displayMeta.opennessLabel === '不公开' ? 'is-closed' : 'is-partial'}`}>{displayMeta.opennessLabel}</span>
+                  <span className="visual-line visual-line-one" />
+                  <span className="visual-line visual-line-two" />
+                  <span className="visual-node node-one" />
+                  <span className="visual-node node-two" />
+                  <span className="visual-node node-three" />
+                  <span className="visual-node node-four" />
+                  <span className="visual-bar bar-one" />
+                  <span className="visual-bar bar-two" />
+                  <span className="visual-bar bar-three" />
+                  <span className="visual-bar bar-four" />
+                </div>
+                <div className="catalog-card-meta-row">
                   <div className="catalog-card-tags">
                     <span className="catalog-subject-tag">{item.subject}</span>
                     <span>{item.corpusType}</span>
-                    <span className={displayMeta.opennessLabel === '全部公开' ? 'is-open' : ''}>{displayMeta.opennessLabel}</span>
                   </div>
-                  <div className="catalog-card-status-block">
-                    {isResultsPage && <span className={`upload-status ${displayMeta.status === '已上传' ? 'is-uploaded' : 'is-pending'}`}>{displayMeta.status}</span>}
-                    <time dateTime={item.publishedAt}><CalendarDays size={13} />{item.publishedAt}</time>
-                  </div>
+                  <time dateTime={item.publishedAt}><CalendarDays size={13} />{item.publishedAt}</time>
                 </div>
                 <h3>{item.title}</h3>
                 <div className="catalog-card-metadata">
@@ -727,10 +773,11 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
                   </div>
                 )}
                 <footer>
-                  <span><Eye size={14} />{item.views.toLocaleString()}</span>
-                  <span><Heart size={14} />{item.favorites.toLocaleString()}</span>
+                  <span className="card-org-mark" aria-hidden="true">北</span>
+                  <strong className="card-organization-name">{item.organization} - {item.authors}</strong>
                   <span><Download size={14} />{item.usage.toLocaleString()}</span>
-                  <strong>{isResultsPage ? '查看详情' : '进入检索结果'} <ChevronRight size={14} /></strong>
+                  <span><Eye size={14} />{item.views.toLocaleString()}</span>
+                  <span><Star size={14} />{item.favorites.toLocaleString()}</span>
                 </footer>
               </Link>
               )
