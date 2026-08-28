@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Search, Wrench, X } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Search, X } from 'lucide-react'
 import toolMarketData from '../data/tool-market.json'
 
 type Subject = '数学' | '物理' | '化学' | '天文' | '地理' | '生物'
@@ -15,6 +15,7 @@ type ToolRecord = {
 
 const tools = toolMarketData as ToolRecord[]
 const subjects: Array<'全部工具' | Subject> = ['全部工具', '数学', '物理', '化学', '天文', '地理', '生物']
+const suggestedKeywords = ['实验', '训练', '抽取', '图像', '对齐', '标注']
 const PAGE_SIZE = 12
 
 function visiblePageNumbers(current: number, total: number) {
@@ -23,40 +24,57 @@ function visiblePageNumbers(current: number, total: number) {
   return Array.from({ length: Math.max(0, end - start + 1) }, (_, index) => start + index)
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function highlightKeyword(text: string, keyword: string) {
+  const searchTerm = keyword.trim()
+  if (!searchTerm) return text
+
+  const normalizedSearchTerm = searchTerm.toLocaleLowerCase('zh-CN')
+  const parts = text.split(new RegExp(`(${escapeRegExp(searchTerm)})`, 'gi'))
+
+  return parts.map((part, index) => {
+    if (part.toLocaleLowerCase('zh-CN') !== normalizedSearchTerm) return part
+    return (
+      <mark className="tool-search-highlight" key={`${part}-${index}`}>
+        {part}
+      </mark>
+    )
+  })
+}
+
 export default function ToolMarket() {
   const [subject, setSubject] = useState<(typeof subjects)[number]>('全部工具')
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
-  const [selectedTool, setSelectedTool] = useState<ToolRecord | null>(null)
 
-  const subjectCounts = useMemo(() => {
-    const counts = new Map<string, number>([['全部工具', tools.length]])
-    subjects.slice(1).forEach((item) => counts.set(item, tools.filter((tool) => tool.subject === item).length))
-    return counts
-  }, [])
+  const normalizedKeyword = keyword.trim().toLocaleLowerCase('zh-CN')
 
-  const filteredTools = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLocaleLowerCase('zh-CN')
+  const keywordMatchedTools = useMemo(() => {
     return tools.filter((tool) => {
-      const subjectMatched = subject === '全部工具' || tool.subject === subject
       const keywordMatched = !normalizedKeyword || [tool.name, tool.description, tool.subject]
         .some((value) => value.toLocaleLowerCase('zh-CN').includes(normalizedKeyword))
-      return subjectMatched && keywordMatched
+      return keywordMatched
     })
-  }, [keyword, subject])
+  }, [normalizedKeyword])
+
+  const subjectCounts = useMemo(() => {
+    const counts = new Map<string, number>([['全部工具', keywordMatchedTools.length]])
+    subjects.slice(1).forEach((item) => {
+      counts.set(item, keywordMatchedTools.filter((tool) => tool.subject === item).length)
+    })
+    return counts
+  }, [keywordMatchedTools])
+
+  const filteredTools = useMemo(() => {
+    return keywordMatchedTools.filter((tool) => subject === '全部工具' || tool.subject === subject)
+  }, [keywordMatchedTools, subject])
 
   const pageCount = Math.max(1, Math.ceil(filteredTools.length / PAGE_SIZE))
   const pageTools = filteredTools.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-
-  useEffect(() => {
-    if (!selectedTool) return
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelectedTool(null)
-    }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [selectedTool])
 
   const chooseSubject = (nextSubject: (typeof subjects)[number]) => {
     setSubject(nextSubject)
@@ -75,6 +93,12 @@ export default function ToolMarket() {
     setPage(1)
   }
 
+  const searchSuggestedKeyword = (nextKeyword: string) => {
+    setKeywordInput(nextKeyword)
+    setKeyword(nextKeyword)
+    setPage(1)
+  }
+
   const goToPage = (nextPage: number) => {
     setPage(Math.min(Math.max(nextPage, 1), pageCount))
     document.querySelector('.tool-market-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -84,7 +108,6 @@ export default function ToolMarket() {
     <div className="tool-market-page">
       <section className="tool-market-hero">
         <div className="tool-market-hero-inner">
-          <span className="tool-market-hero-kicker">六大学科语料加工工具汇聚平台</span>
           <h1>工具链市场</h1>
           <p>汇聚六大学科语料加工工具，服务科学语料采集、解析、清洗、标注、对齐与质量评估</p>
 
@@ -104,6 +127,19 @@ export default function ToolMarket() {
             )}
             <button className="tool-market-search-submit" type="submit">搜索</button>
           </form>
+
+          <div className="tool-search-suggestions" aria-label="建议检索词">
+            {suggestedKeywords.map((item) => (
+              <button
+                className={keyword === item ? 'is-active' : ''}
+                key={item}
+                onClick={() => searchSuggestedKeyword(item)}
+                type="button"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -131,11 +167,6 @@ export default function ToolMarket() {
               <h2>{subject}</h2>
               <p>共收录 <strong>{filteredTools.length}</strong> 条工具链</p>
             </div>
-            {keyword && (
-              <button className="tool-active-keyword" type="button" onClick={clearSearch}>
-                搜索：{keyword}<X aria-hidden="true" />
-              </button>
-            )}
           </header>
 
           {pageTools.length > 0 ? (
@@ -144,32 +175,20 @@ export default function ToolMarket() {
                 <article
                   className="tool-market-card"
                   key={tool.id}
-                  onClick={() => setSelectedTool(tool)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      setSelectedTool(tool)
-                    }
-                  }}
-                  role="button"
                   tabIndex={0}
                 >
                   <div className="tool-card-heading">
-                    <span className="tool-card-icon"><Wrench aria-hidden="true" /></span>
                     <span className="tool-subject-tag">{tool.subject}</span>
+                    <h3>{highlightKeyword(tool.name, keyword)}</h3>
                   </div>
-                  <h3>{tool.name}</h3>
                   <div className="tool-card-description">
                     <strong>处理场景</strong>
-                    <p>{tool.description}</p>
+                    <p>{highlightKeyword(tool.description, keyword)}</p>
                   </div>
 
                   <div className="tool-card-hover-detail" role="tooltip">
-                    <div className="tool-card-hover-title">
-                      <span>{tool.subject}</span>
-                      <strong>{tool.name}</strong>
-                    </div>
-                    <p>{tool.description}</p>
+                    <strong>{highlightKeyword(tool.name, keyword)}</strong>
+                    <p>{highlightKeyword(tool.description, keyword)}</p>
                   </div>
                 </article>
               ))}
@@ -203,31 +222,6 @@ export default function ToolMarket() {
         </div>
       </section>
 
-      {selectedTool && (
-        <div className="tool-detail-dialog-backdrop" role="presentation" onMouseDown={() => setSelectedTool(null)}>
-          <section
-            aria-labelledby="tool-detail-title"
-            aria-modal="true"
-            className="tool-detail-dialog"
-            onMouseDown={(event) => event.stopPropagation()}
-            role="dialog"
-          >
-            <header>
-              <div>
-                <span>{selectedTool.subject}</span>
-                <h2 id="tool-detail-title">{selectedTool.name}</h2>
-              </div>
-              <button type="button" onClick={() => setSelectedTool(null)} aria-label="关闭完整介绍">
-                <X aria-hidden="true" />
-              </button>
-            </header>
-            <div className="tool-detail-dialog-body">
-              <h3>处理场景</h3>
-              <p>{selectedTool.description}</p>
-            </div>
-          </section>
-        </div>
-      )}
     </div>
   )
 }

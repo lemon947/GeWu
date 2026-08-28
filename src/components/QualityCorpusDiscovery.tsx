@@ -104,12 +104,6 @@ function sortCorpus(items: CorpusItem[], sortKey: SortKey) {
   return copied.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
 }
 
-function opennessLabel(openness: string) {
-  if (openness === '开放共享') return '全部公开'
-  if (openness === '不公开' || openness === '暂不开放') return '不公开'
-  return '部分公开'
-}
-
 export default function QualityCorpusDiscovery() {
   const [activeTab, setActiveTab] = useState<SortKey>('latest')
   const visibleCorpus = useMemo(() => sortCorpus(corpusItems, activeTab).slice(0, 6), [activeTab])
@@ -149,12 +143,10 @@ export default function QualityCorpusDiscovery() {
           role="tabpanel"
           aria-labelledby={`quality-tab-${activeTab}`}
         >
-          {visibleCorpus.map((item) => {
-            const openness = opennessLabel(item.openness)
-            return (
+          {visibleCorpus.map((item) => (
             <Link className="quality-corpus-card" to={`/search/datasets/${item.id}`} key={item.id}>
               <div className="quality-card-visual" aria-hidden="true">
-                <span className={`card-status-overlay ${openness === '全部公开' ? 'is-open' : openness === '不公开' ? 'is-closed' : 'is-partial'}`}>{openness}</span>
+                <span className="card-status-overlay is-partial">部分公开</span>
                 <span className="visual-line visual-line-one" />
                 <span className="visual-line visual-line-two" />
                 <span className="visual-node node-one" />
@@ -170,7 +162,6 @@ export default function QualityCorpusDiscovery() {
               <div className="quality-card-meta-row">
                 <div className="quality-card-tags">
                   <span className="domain-tag">{item.domain}</span>
-                  <span>{item.type}</span>
                 </div>
                 <time dateTime={item.publishedAt}><CalendarDays size={13} />{item.publishedAt}</time>
               </div>
@@ -186,8 +177,7 @@ export default function QualityCorpusDiscovery() {
                 <span><Star size={15} />{item.favorites.toLocaleString()}</span>
               </footer>
             </Link>
-            )
-          })}
+          ))}
         </div>
       </div>
     </section>

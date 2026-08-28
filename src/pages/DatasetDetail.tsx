@@ -1,25 +1,30 @@
 import { type FormEvent, useMemo, useRef, useState } from 'react'
 import {
+  ArrowLeft,
   ArrowUpFromLine,
   Building2,
   CalendarDays,
   Check,
-  ChevronRight,
-  ClipboardCheck,
-  Code2,
+  ChevronDown,
+  Copy,
   Download,
+  Eye,
   FileArchive,
+  FileJson,
   FileText,
   Folder,
   FolderUp,
   Github,
   Info,
   Mail,
+  MessageCircle,
   Pencil,
+  Search,
   Share2,
   ShieldCheck,
   Star,
   ThumbsUp,
+  Trash2,
   Upload,
   UserPlus,
   Users,
@@ -29,33 +34,70 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useApp } from '../context/app-context'
 import { corpusRecords, recordDisplayMeta } from './CorpusSearch'
 
-type DetailTab = 'guide' | 'preview' | 'feedback'
-type PendingAction = 'edit' | 'upload' | 'download' | null
+type DetailTab = 'intro' | 'download' | 'comments'
 type UploadMode = 'local' | 'external'
 type MemberPermission = '可管理' | '可编辑' | '可使用'
+type CommentSort = 'time' | 'likes'
 
-const previewFiles = [
-  { name: 'README.md', type: 'file' },
-  { name: 'metadata.json', type: 'file' },
-  { name: '训练数据', type: 'folder' },
-  { name: 'train_0001.jsonl', type: 'file', nested: true },
-  { name: 'train_0002.jsonl', type: 'file', nested: true },
-  { name: '示例数据', type: 'folder' },
-  { name: 'sample.jsonl', type: 'file', nested: true },
+const permissionDescriptions: Record<MemberPermission, string> = {
+  可管理: '可以管理成员、编辑和下载使用全部语料',
+  可编辑: '可编辑和下载使用全部语料',
+  可使用: '仅可下载使用全部语料',
+}
+
+const previewTree = [
+  { name: 'v1.2.0 / metadata.json', file: 'metadata.json' },
+  { name: 'v1.2.0 / sample.jsonl', file: 'sample.jsonl' },
+  { name: 'v1.1.0 / train.schema.json', file: 'schema.json' },
+  { name: 'v1.0.0 / README.md', file: 'README.md' },
 ]
 
 const previewContent: Record<string, string> = {
-  'README.md': `# 数据集说明\n\n本语料集面向基础学科模型训练与专业推理能力提升，包含规范化问题、推理过程、结论与来源信息。`,
   'metadata.json': `{
-  "title": "高质量科学语料示例",
   "language": "zh-CN",
-  "license": "平台科研使用许可协议",
-  "modalities": ["text", "formula"],
-  "version": "1.0.0"
+  "subject": "science",
+  "license": "research-use",
+  "version": "1.2.0",
+  "fields": ["instruction", "context", "reasoning", "answer", "source"]
 }`,
-  'train_0001.jsonl': `{"id":"math_000001","question":"证明连续函数在闭区间上有界","reasoning":"首先利用闭区间的紧致性……","answer":"因此函数在该区间上有界","source":"专业教材"}\n{"id":"math_000002","question":"计算该积分并说明换元依据","reasoning":"识别被积函数结构后……","answer":"积分结果为……","source":"课程习题"}`,
-  'train_0002.jsonl': `{"id":"science_000003","instruction":"分析实验现象并给出推理过程","evidence":["实验记录","参数表"],"response":"根据观测证据可得到……"}`,
-  'sample.jsonl': `{"sample":true,"subject":"科学语料","content":"此处展示平台允许公开浏览的示例数据。"}`,
+  'sample.jsonl': `{"id":"sample_0001","instruction":"分析该科学问题的关键变量","reasoning":"首先抽取研究对象、条件约束与可验证结论……","answer":"形成结构化推理链与结论。"}
+{"id":"sample_0002","instruction":"给出可复现实验数据说明","reasoning":"依据数据来源、采样方式和质量控制步骤组织元数据……","answer":"输出标准化数据卡。"}`,
+  'schema.json': `{
+  "type": "object",
+  "required": ["id", "instruction", "answer"],
+  "properties": {
+    "id": { "type": "string" },
+    "reasoning": { "type": "string" },
+    "source": { "type": "string" }
+  }
+}`,
+  'README.md': `# 语料说明
+
+本语料库按历史版本组织文件目录，提供公开样例、元数据、字段说明和数据质量记录。`,
+}
+
+const commentsSeed = [
+  { id: 1, user: '林知远', date: '2026-08-18', likes: 24, text: '样例数据结构很清楚，适合快速接入模型评测流程，希望后续补充更多字段说明。' },
+  { id: 2, user: '医学语料联合实验室', date: '2026-08-12', likes: 18, text: '对科研问答和推理链训练很有帮助，下载目录划分也比较明确。' },
+  { id: 3, user: '陈明', date: '2026-08-02', likes: 31, text: '建议增加数据质量报告和版本间差异说明，方便长期引用。' },
+]
+
+function detailOpennessLabel(openness: string) {
+  if (openness === '开放共享') return '全部公开'
+  if (openness === '不公开' || openness === '暂不开放') return '不公开'
+  return '部分公开'
+}
+
+function languageForSubject(subject: string) {
+  if (subject === '数学' || subject === '物理') return '中文/英文'
+  if (subject === '化学' || subject === '生物') return '中文'
+  return '中文/英文'
+}
+
+function formatForSubject(subject: string) {
+  if (subject === '化学') return '反应SMARTS + 结构化文本'
+  if (subject === '地理' || subject === '天文') return 'CSV、JSON、XML、API接口'
+  return 'CSV / JSON / SQL'
 }
 
 export default function DatasetDetail() {
@@ -64,42 +106,51 @@ export default function DatasetDetail() {
   const { user, openAuth, favorites, toggleFavorite } = useApp()
   const item = corpusRecords.find((record) => record.id === id) ?? corpusRecords[0]
   const displayMeta = recordDisplayMeta(item)
-  const isOwner = Boolean(user)
+  const openness = detailOpennessLabel(item.openness)
   const favorite = favorites.some((record) => record.id === item.id)
   const verifiedKey = user ? `gw-realname-${user.account}` : 'gw-realname-guest'
-  const [verified, setVerified] = useState(() => window.localStorage.getItem(verifiedKey) === 'true')
-  const [liked, setLiked] = useState(() => window.localStorage.getItem(`gw-liked-${item.id}`) === 'true')
-  const [activeTab, setActiveTab] = useState<DetailTab>('guide')
-  const [selectedFile, setSelectedFile] = useState('README.md')
-  const [toast, setToast] = useState('')
-  const [realnameOpen, setRealnameOpen] = useState(false)
-  const [pendingAction, setPendingAction] = useState<PendingAction>(null)
+
+  const [activeTab, setActiveTab] = useState<DetailTab>('intro')
+  const [selectedFile, setSelectedFile] = useState('metadata.json')
+  const [selectedDownloadFile, setSelectedDownloadFile] = useState('sample.jsonl')
+  const [memberOpen, setMemberOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploadMode, setUploadMode] = useState<UploadMode>('local')
-  const [memberOpen, setMemberOpen] = useState(false)
-  const [memberAccount, setMemberAccount] = useState('')
+  const [memberQuery, setMemberQuery] = useState('')
   const [memberPermission, setMemberPermission] = useState<MemberPermission>('可编辑')
-  const [members, setMembers] = useState<Array<{ account: string; permission: MemberPermission }>>([
-    { account: 'corpus_editor01', permission: '可编辑' },
-    { account: 'research_user02', permission: '可使用' },
+  const [metadataFormat, setMetadataFormat] = useState<'JSON' | 'CSV'>('JSON')
+  const [commentSort, setCommentSort] = useState<CommentSort>('time')
+  const [commentDraft, setCommentDraft] = useState('')
+  const [commentComposerOpen, setCommentComposerOpen] = useState(false)
+  const [toast, setToast] = useState('')
+  const [verified, setVerified] = useState(() => window.localStorage.getItem(verifiedKey) === 'true')
+  const [members, setMembers] = useState<Array<{ account: string; name: string; permission: MemberPermission }>>([
+    { account: 'corpus_admin', name: '语料管理员', permission: '可管理' },
+    { account: 'corpus_editor01', name: '建设编辑', permission: '可编辑' },
+    { account: 'research_user02', name: '科研使用者', permission: '可使用' },
   ])
-  const [feedbackTask, setFeedbackTask] = useState('')
-  const [feedbackModel, setFeedbackModel] = useState('')
-  const [feedbackEffect, setFeedbackEffect] = useState('')
-  const [feedbackSuggestion, setFeedbackSuggestion] = useState('')
+  const [comments, setComments] = useState(commentsSeed)
   const toastTimer = useRef<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
-  const openness = displayMeta.opennessLabel
-  const canDownloadAll = isOwner || openness === '全部公开'
-  const restrictedPreview = !isOwner && openness === '不公开'
-  const likeCount = item.favorites + 120 + (liked ? 1 : 0)
   const updatedAt = useMemo(() => {
     const date = new Date(item.publishedAt)
-    date.setDate(date.getDate() + 12)
+    date.setDate(date.getDate() + 16)
     return date.toISOString().slice(0, 10)
   }, [item.publishedAt])
+
+  const relatedRecords = useMemo(() => {
+    const sameSubject = corpusRecords.filter((record) => record.id !== item.id && record.subject === item.subject)
+    const fallback = corpusRecords.filter((record) => record.id !== item.id && record.subject !== item.subject)
+    return [...sameSubject, ...fallback].slice(0, 5)
+  }, [item.id, item.subject])
+
+  const sortedComments = useMemo(() => {
+    const copied = [...comments]
+    if (commentSort === 'likes') return copied.sort((a, b) => b.likes - a.likes)
+    return copied.sort((a, b) => b.date.localeCompare(a.date))
+  }, [commentSort, comments])
 
   const notify = (message: string) => {
     setToast(message)
@@ -107,234 +158,306 @@ export default function DatasetDetail() {
     toastTimer.current = window.setTimeout(() => setToast(''), 2600)
   }
 
-  const beginProtectedAction = (action: Exclude<PendingAction, null>) => {
+  const ensureVerified = (next: () => void) => {
     if (!user) {
-      openAuth()
+      openAuth(`/search/datasets/${item.id}`)
       notify('请先登录后继续操作')
       return
     }
     if (!verified) {
-      setPendingAction(action)
-      setRealnameOpen(true)
-      return
+      window.localStorage.setItem(verifiedKey, 'true')
+      setVerified(true)
+      notify('已完成演示实名认证')
     }
-    if (action === 'edit') navigate(`/upload?edit=${item.id}`)
-    else setUploadOpen(true)
+    next()
   }
 
-  const submitRealname = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    window.localStorage.setItem(verifiedKey, 'true')
-    setVerified(true)
-    setRealnameOpen(false)
-    notify('实名认证已提交并通过验证')
-    if (pendingAction === 'edit') navigate(`/upload?edit=${item.id}`)
-    if (pendingAction === 'upload') setUploadOpen(true)
-    if (pendingAction === 'download') performDownload()
-    setPendingAction(null)
-  }
-
-  const handleLike = () => {
-    const next = !liked
-    setLiked(next)
-    window.localStorage.setItem(`gw-liked-${item.id}`, String(next))
-  }
-
-  const handleShare = async () => {
+  const copyShareLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href)
-      notify('已复制链接，可以转发')
+      notify('已复制链接 可以转发')
     } catch {
-      notify('链接已准备好，请从浏览器地址栏复制')
+      notify('链接已准备好，请从地址栏复制')
     }
   }
 
-  const performDownload = () => {
-    if (openness === '不公开' && !isOwner) {
-      notify('该语料暂不公开，请联系作者申请下载权限')
-      return
-    }
-    const scope = canDownloadAll ? '全部数据' : '公开部分数据'
-    const content = JSON.stringify({ corpus: item.title, scope, generatedAt: new Date().toISOString(), sample: previewContent['sample.jsonl'] }, null, 2)
-    const url = URL.createObjectURL(new Blob([content], { type: 'application/json;charset=utf-8' }))
+  const downloadBlob = (filename: string, content: string, type = 'application/json;charset=utf-8') => {
+    const url = URL.createObjectURL(new Blob([content], { type }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `${item.id}-${canDownloadAll ? 'full' : 'public'}.json`
+    anchor.download = filename
     anchor.click()
     URL.revokeObjectURL(url)
-    notify(openness === '部分公开' && !isOwner ? '已下载公开部分数据，完整数据请联系作者申请' : '下载任务已开始')
   }
 
-  const handleDownload = () => {
-    if (!user) {
-      openAuth()
-      notify('请先登录并完成实名认证')
+  const downloadCorpus = () => {
+    if (openness === '不公开') {
+      notify('该语料库暂时未公开，若需要可联系作者')
       return
     }
-    if (!verified) {
-      setPendingAction('download')
-      setRealnameOpen(true)
-      return
+    const scope = openness === '全部公开' ? '全部数据' : '作者公开的数据'
+    downloadBlob(`${item.id}-${selectedDownloadFile}.json`, JSON.stringify({ corpus: item.title, scope, file: selectedDownloadFile, sample: previewContent[selectedDownloadFile] }, null, 2))
+    notify(openness === '全部公开' ? '已开始下载全部数据' : '已开始下载公开数据')
+  }
+
+  const exportMetadata = () => {
+    if (metadataFormat === 'CSV') {
+      downloadBlob(`${item.id}-metadata.csv`, `字段,内容\n语料名称,${item.title}\n学科领域,${item.subject}\n开放程度,${openness}\n发布机构,${item.organization}`, 'text/csv;charset=utf-8')
+    } else {
+      downloadBlob(`${item.id}-metadata.json`, JSON.stringify({ title: item.title, subject: item.subject, type: item.corpusType, openness, organization: item.organization, updatedAt }, null, 2))
     }
-    performDownload()
+    notify('元数据已导出')
   }
 
   const addMember = () => {
-    const account = memberAccount.trim()
-    if (!account) return
-    setMembers((current) => [...current.filter((member) => member.account !== account), { account, permission: memberPermission }])
-    setMemberAccount('')
+    const value = memberQuery.trim()
+    if (!value) return
+    const name = value.includes('@') ? value.split('@')[0] : value
+    setMembers((current) => [...current.filter((member) => member.account !== value), { account: value, name, permission: memberPermission }])
+    setMemberQuery('')
     notify('成员已添加')
+  }
+
+  const removeMember = (account: string) => {
+    if (!window.confirm('确认移除该成员吗？')) return
+    setMembers((current) => current.filter((member) => member.account !== account))
+    notify('成员已移除')
   }
 
   const submitUpload = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setUploadOpen(false)
-    notify('语料已提交，等待最高管理员审核')
+    notify('语料已提交，等待管理员审核')
   }
 
-  const submitFeedback = (event: FormEvent<HTMLFormElement>) => {
+  const submitComment = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    notify('反馈提交成功，感谢您的使用')
-    setFeedbackTask('')
-    setFeedbackModel('')
-    setFeedbackEffect('')
-    setFeedbackSuggestion('')
+    const value = commentDraft.trim()
+    if (!value) return
+    setComments((current) => [{ id: Date.now(), user: user?.account ?? '科学语料用户', date: new Date().toISOString().slice(0, 10), likes: 0, text: value }, ...current])
+    setCommentDraft('')
+    setCommentComposerOpen(false)
+    notify('评论已发布')
   }
 
   return (
-    <main className="dataset-detail-page">
-      <nav className="dataset-breadcrumb" aria-label="网页层级">
-        <Link to="/">首页</Link><ChevronRight size={14} />
-        <Link to="/search/results">语料集</Link><ChevronRight size={14} />
-        <span>{item.title}</span>
-      </nav>
+    <main className="dataset-detail-page dataset-detail-v2">
+      <button className="dataset-back-button" type="button" onClick={() => navigate(-1)}><ArrowLeft size={17} />返回</button>
 
-      <div className="dataset-detail-layout">
-        <section className="dataset-summary-card">
+      <div className="dataset-detail-layout dataset-detail-layout-v2">
+        <section className="dataset-summary-card dataset-hero-card">
           <div className="dataset-summary-head">
-            <div className="dataset-badges">
-              <span className={`dataset-status ${displayMeta.status === '已上传' ? 'is-uploaded' : 'is-pending'}`}>{displayMeta.status}</span>
-              <span>{item.subject}</span><span>{item.corpusType}</span><span className="is-open">{openness}</span>
+            <div>
+              <h1>{item.title}</h1>
+              <div className="dataset-badges">
+                <span className="is-subject">{item.subject}</span>
+                <span>{item.corpusType}</span>
+                <span className="is-open">{openness}</span>
+                <span className={`dataset-status ${displayMeta.status === '已上传' ? 'is-uploaded' : 'is-pending'}`}>{displayMeta.status}</span>
+              </div>
             </div>
             <div className="dataset-admin-actions">
-              {isOwner && <button type="button" onClick={() => beginProtectedAction('edit')}><Pencil size={15} />编辑语料</button>}
-              {isOwner && <button type="button" onClick={() => setMemberOpen(true)}><Users size={15} />管理成员</button>}
-              <button type="button" onClick={() => beginProtectedAction('upload')}><Upload size={15} />上传语料</button>
+              <button type="button" onClick={() => ensureVerified(() => navigate(`/upload?edit=${item.id}`))}><Pencil size={15} />编辑</button>
+              <button type="button" onClick={() => ensureVerified(() => setMemberOpen(true))}><Users size={15} />管理成员</button>
+              <button type="button" onClick={() => ensureVerified(() => setUploadOpen(true))}><Upload size={15} />上传</button>
             </div>
           </div>
 
-          <div className="dataset-title-block">
-            <p className="dataset-id">语料集编号：GW-{item.id.toUpperCase()}</p>
-            <h1>{item.title}</h1>
-            <p>{item.summary}</p>
-          </div>
-
-          <div className="dataset-metadata-grid">
-            <div><span>发布机构</span><strong><Building2 size={15} />{item.organization}</strong></div>
-            <div><span>作者姓名</span><strong>{item.authors}</strong></div>
-            <div><span>发布时间</span><strong><CalendarDays size={15} />{item.publishedAt}</strong></div>
+          <div className="dataset-hero-meta-grid">
+            <div><span>发布机构</span><strong><Building2 size={16} />{item.organization} - {item.authors}</strong></div>
+            <div><span>发布时间</span><strong><CalendarDays size={16} />{item.publishedAt}</strong></div>
             <div><span>更新时间</span><strong>{updatedAt}</strong></div>
             <div><span>语料规模</span><strong>{displayMeta.corpusSize}</strong></div>
             <div><span>存储容量</span><strong>{displayMeta.storageSize}</strong></div>
           </div>
 
-          <div className="dataset-social-actions">
-            <button type="button" className={liked ? 'is-active' : ''} onClick={handleLike}><ThumbsUp size={17} />点赞 <b>{likeCount}</b></button>
-            <button type="button" className={favorite ? 'is-active' : ''} onClick={() => { toggleFavorite({ id: item.id, title: item.title }); notify(favorite ? '已取消收藏' : '已收藏，可在个人主页查看') }}><Star size={17} />{favorite ? '已收藏' : '收藏'}</button>
-            <button type="button" onClick={handleShare}><Share2 size={17} />转发</button>
-            <button type="button" className="dataset-download-button" onClick={handleDownload}><Download size={17} />{canDownloadAll ? '下载数据' : openness === '部分公开' ? '下载公开数据' : '申请下载'}</button>
+          <article className="dataset-description-block">
+            <h2>语料简介</h2>
+            <p>{item.summary}</p>
+          </article>
+
+          <div className="dataset-social-actions dataset-social-actions-v2">
+            <span><Eye size={17} />浏览量 <b>{item.views.toLocaleString()}</b></span>
+            <span><Download size={17} />下载量 <b>{item.usage.toLocaleString()}</b></span>
+            <button type="button" className={favorite ? 'is-active' : ''} onClick={() => { toggleFavorite({ id: item.id, title: item.title }); notify(favorite ? '已取消收藏' : '已收藏，可在个人主页查看') }}><Star size={17} />收藏 <b>{(item.favorites + (favorite ? 1 : 0)).toLocaleString()}</b></button>
+            <button type="button" onClick={copyShareLink}><Share2 size={17} />转发</button>
           </div>
         </section>
 
-        <aside className="dataset-side-column">
+        <aside className="dataset-side-column dataset-side-column-v2">
           <section className="dataset-side-card">
             <div className="side-card-title"><Info size={18} /><h2>基本信息</h2></div>
-            <dl><div><dt>语料类型</dt><dd>{item.corpusType}</dd></div><div><dt>开放程度</dt><dd>{openness}</dd></div><div><dt>语料格式</dt><dd>JSONL、Markdown</dd></div><div><dt>时间跨度</dt><dd>2018—2026年</dd></div></dl>
+            <dl>
+              <div><dt>语种类别</dt><dd>{languageForSubject(item.subject)}</dd></div>
+              <div><dt>语料格式</dt><dd>{formatForSubject(item.subject)}</dd></div>
+              <div><dt>时间跨度</dt><dd>{item.subject === '数学' ? '2000年-至今' : '2020年-至今'}</dd></div>
+            </dl>
           </section>
+
+          <section className="dataset-side-card author-card">
+            <div className="author-avatar">{item.authors.slice(0, 1)}</div>
+            <div>
+              <h2>作者：{item.authors}</h2>
+              <p>{item.organization}</p>
+              <a href={`mailto:corpus@pku.edu.cn?subject=${encodeURIComponent(`申请使用：${item.title}`)}`}><Mail size={14} />联系作者</a>
+            </div>
+          </section>
+
+          <section className="dataset-side-card">
+            <div className="side-card-title"><FileArchive size={18} /><h2>历史版本</h2></div>
+            <ol className="version-list">
+              <li><strong>v1.2.0</strong><span>{updatedAt} 更新</span></li>
+              <li><strong>v1.1.0</strong><span>2026-07-28 补充元数据</span></li>
+              <li><strong>v1.0.0</strong><span>{item.publishedAt} 首次发布</span></li>
+            </ol>
+          </section>
+
           <section className="dataset-side-card">
             <div className="side-card-title"><ShieldCheck size={18} /><h2>权益信息</h2></div>
-            <dl><div><dt>权益主体</dt><dd>{item.organization}</dd></div><div><dt>授权方式</dt><dd>{openness === '全部公开' ? '科研与教学开放许可' : '依申请授权使用'}</dd></div></dl>
-            <a className="dataset-contact" href={`mailto:corpus@pku.edu.cn?subject=${encodeURIComponent(`申请使用：${item.title}`)}`}><Mail size={15} />联系作者申请权限</a>
+            <dl>
+              <div><dt>权益主体</dt><dd>{item.organization}</dd></div>
+              <div><dt>授权方式</dt><dd>{openness === '全部公开' ? '开放共享许可' : openness === '部分公开' ? '依申请开放许可' : '不公开'}</dd></div>
+            </dl>
+          </section>
+
+          <section className="dataset-side-card metadata-export-card">
+            <div className="side-card-title"><FileJson size={18} /><h2>元数据下载</h2></div>
+            <div className="metadata-export-row">
+              <select value={metadataFormat} onChange={(event) => setMetadataFormat(event.target.value as 'JSON' | 'CSV')}>
+                <option>JSON</option>
+                <option>CSV</option>
+              </select>
+              <button type="button" onClick={exportMetadata}>Export</button>
+              <button type="button" aria-label="复制元数据" onClick={() => { navigator.clipboard?.writeText(item.title); notify('元数据摘要已复制') }}><Copy size={17} /></button>
+            </div>
           </section>
         </aside>
       </div>
 
-      <section className="dataset-content-panel">
+      <section className="dataset-content-panel dataset-content-panel-v2">
         <div className="dataset-content-tabs" role="tablist">
-          <button type="button" className={activeTab === 'guide' ? 'is-active' : ''} onClick={() => setActiveTab('guide')}><FileText size={17} />使用说明</button>
-          <button type="button" className={activeTab === 'preview' ? 'is-active' : ''} onClick={() => setActiveTab('preview')}><Code2 size={17} />语料预览</button>
-          <button type="button" className={activeTab === 'feedback' ? 'is-active' : ''} onClick={() => setActiveTab('feedback')}><ClipboardCheck size={17} />用户反馈</button>
+          <button type="button" className={activeTab === 'intro' ? 'is-active' : ''} onClick={() => setActiveTab('intro')}><FileText size={17} />语料介绍</button>
+          <button type="button" className={activeTab === 'download' ? 'is-active' : ''} onClick={() => setActiveTab('download')}><Download size={17} />语料下载</button>
+          <button type="button" className={activeTab === 'comments' ? 'is-active' : ''} onClick={() => setActiveTab('comments')}><MessageCircle size={17} />评论（{comments.length}）</button>
         </div>
 
-        {activeTab === 'guide' && (
-          <div className="dataset-guide-grid">
-            <article><h2>语料说明</h2><p>{item.summary}</p><h3>主要数据来源</h3><ul><li>高校专业教材、培养方案与课程资料</li><li>科研文献、实验记录及规范化数据资源</li><li>经专家校验的领域知识与推理过程</li></ul></article>
-            <article><h2>下载教程</h2><ol><li>根据开放程度确认可下载的数据范围</li><li>点击页面上方“下载”按钮获取数据文件</li><li>部分公开或不公开数据可通过“联系作者”申请</li><li>使用数据时请遵循对应许可协议并规范引用</li></ol></article>
+        {activeTab === 'intro' && (
+          <div className="dataset-tab-body">
+            <section className="dataset-intro-section">
+              <h2>摘要</h2>
+              <p>{item.summary} 平台围绕数据来源、结构化处理、质量校验和版本管理沉淀元数据，支持科研、教学和模型训练场景复用。</p>
+              <div className="keyword-row">{item.keywords.map((keyword) => <span key={keyword}>{keyword}</span>)}</div>
+            </section>
+            <section className="dataset-browser">
+              <aside>
+                <strong>语料预览</strong>
+                {previewTree.map((node) => <button type="button" className={selectedFile === node.file ? 'is-active' : ''} key={node.file} onClick={() => setSelectedFile(node.file)}><Folder size={15} />{node.name}</button>)}
+              </aside>
+              <div className="preview-code-panel">
+                <div><span>{selectedFile}</span><small>历史版本样例数据</small></div>
+                <pre><code>{previewContent[selectedFile]}</code></pre>
+              </div>
+            </section>
           </div>
         )}
 
-        {activeTab === 'preview' && (
-          <div className="dataset-preview-layout">
-            <aside className="preview-file-tree">
-              <strong>示例文件</strong>
-              {previewFiles.map((file) => (
-                <button type="button" key={file.name} className={`${file.nested ? 'is-nested ' : ''}${selectedFile === file.name ? 'is-active' : ''}`} disabled={file.type === 'folder'} onClick={() => file.type === 'file' && setSelectedFile(file.name)}>
-                  {file.type === 'folder' ? <Folder size={15} /> : <FileText size={15} />}{file.name}
-                </button>
+        {activeTab === 'download' && (
+          <div className="dataset-tab-body">
+            {openness === '不公开' ? (
+              <div className="private-dataset-note">该语料库暂时未公开，若需要可联系作者。</div>
+            ) : (
+              <section className="dataset-browser">
+                <aside>
+                  <strong>可下载目录</strong>
+                  {previewTree.map((node) => <button type="button" className={selectedDownloadFile === node.file ? 'is-active' : ''} key={node.file} onClick={() => setSelectedDownloadFile(node.file)}><Folder size={15} />{node.name}</button>)}
+                </aside>
+                <div className="preview-code-panel">
+                  <div><span>{selectedDownloadFile}</span><button type="button" onClick={downloadCorpus}><Download size={15} />下载</button></div>
+                  <pre><code>{previewContent[selectedDownloadFile]}</code></pre>
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'comments' && (
+          <div className="dataset-tab-body comments-panel">
+            <div className="comments-toolbar">
+              <label><ChevronDown size={15} />排序
+                <select value={commentSort} onChange={(event) => setCommentSort(event.target.value as CommentSort)}>
+                  <option value="time">按时间</option>
+                  <option value="likes">按点赞量</option>
+                </select>
+              </label>
+              <button type="button" onClick={() => setCommentComposerOpen((open) => !open)}><Pencil size={16} />写评论</button>
+            </div>
+            {commentComposerOpen && (
+              <form className="comment-composer" onSubmit={submitComment}>
+                <textarea maxLength={1000} required value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="请输入评论内容，最多1000字" />
+                <button type="submit">发布评论</button>
+              </form>
+            )}
+            <div className="comment-list">
+              {sortedComments.map((comment) => (
+                <article className="comment-card" key={comment.id}>
+                  <div className="comment-avatar">{comment.user.slice(0, 1)}</div>
+                  <div>
+                    <header><strong>{comment.user}</strong><span>{comment.date}</span></header>
+                    <p>{comment.text}</p>
+                    <button type="button" onClick={() => setComments((current) => current.map((item) => item.id === comment.id ? { ...item, likes: item.likes + 1 } : item))}><ThumbsUp size={15} />{comment.likes}</button>
+                  </div>
+                </article>
               ))}
-            </aside>
-            <div className="preview-code-panel">
-              <div><span>{selectedFile}</span><small>{restrictedPreview ? '仅展示公开样例' : '示例数据预览'}</small></div>
-              <pre><code>{restrictedPreview ? previewContent['sample.jsonl'] : previewContent[selectedFile] ?? '请选择文件查看内容'}</code></pre>
             </div>
           </div>
         )}
-
-        {activeTab === 'feedback' && (
-          <form className="dataset-feedback-form" onSubmit={submitFeedback}>
-            <div className="feedback-heading"><h2>语料使用反馈</h2><p>反馈将用于持续优化语料质量和服务方式</p></div>
-            <label><span>使用本语料完成的任务 <b>*</b></span><input required value={feedbackTask} onChange={(event) => setFeedbackTask(event.target.value)} placeholder="例如：基础学科问答模型训练" /></label>
-            <label><span>涉及的模型名称 <b>*</b></span><input required value={feedbackModel} onChange={(event) => setFeedbackModel(event.target.value)} placeholder="请输入模型名称及版本" /></label>
-            <label className="is-wide"><span>语料效果反馈 <b>*</b></span><textarea required value={feedbackEffect} onChange={(event) => setFeedbackEffect(event.target.value)} placeholder="请描述语料在实际使用中的效果" /></label>
-            <label className="is-wide"><span>其他建议</span><textarea value={feedbackSuggestion} onChange={(event) => setFeedbackSuggestion(event.target.value)} placeholder="可填写数据质量、格式或平台功能建议" /></label>
-            <button type="submit">提交反馈</button>
-          </form>
-        )}
       </section>
 
-      {realnameOpen && (
-        <div className="dataset-modal-overlay">
-          <form className="dataset-modal realname-modal" onSubmit={submitRealname}>
-            <div className="dataset-modal-title"><div><ShieldCheck size={21} /><h2>实名认证</h2></div><button type="button" onClick={() => setRealnameOpen(false)}><X size={18} /></button></div>
-            <p>完成实名认证后可编辑或向语料库上传数据</p>
-            <label><span>真实姓名</span><input required placeholder="请输入真实姓名" /></label>
-            <label><span>联系方式</span><input required placeholder="手机号/邮箱" /></label>
-            <label><span>所在单位</span><input required placeholder="请输入所在单位" /></label>
-            <label><span>验证码</span><div className="verification-row"><input required placeholder="请输入验证码" /><button type="button" onClick={() => notify('验证码已发送')}>获取验证码</button></div></label>
-            <div className="dataset-modal-actions"><button type="button" onClick={() => setRealnameOpen(false)}>取消</button><button type="submit" className="is-primary">提交认证</button></div>
-          </form>
+      <section className="related-datasets-section">
+        <header><h2>相关语料库</h2><Link to="/search/results">查看更多</Link></header>
+        <div className="related-dataset-strip">
+          {relatedRecords.map((record) => (
+            <Link className="related-dataset-card" to={`/search/datasets/${record.id}`} key={record.id}>
+              <span>{record.subject}</span>
+              <strong>{record.title}</strong>
+              <small>{record.organization} - {record.authors}</small>
+            </Link>
+          ))}
         </div>
-      )}
+      </section>
 
       {memberOpen && (
-        <div className="dataset-modal-overlay">
-          <section className="dataset-modal member-modal" role="dialog" aria-modal="true">
-            <div className="dataset-modal-title"><div><Users size={21} /><h2>管理成员</h2></div><button type="button" onClick={() => setMemberOpen(false)}><X size={18} /></button></div>
-            <div className="member-add-row"><input value={memberAccount} onChange={(event) => setMemberAccount(event.target.value)} placeholder="输入用户账号名" /><select value={memberPermission} onChange={(event) => setMemberPermission(event.target.value as MemberPermission)}><option>可管理</option><option>可编辑</option><option>可使用</option></select><button type="button" onClick={addMember}><UserPlus size={16} />添加</button></div>
-            <div className="member-list"><div className="member-list-head"><span>成员账号</span><span>权限</span><span>操作</span></div>{members.map((member) => <div key={member.account}><span>{member.account}</span><span>{member.permission}</span><button type="button" onClick={() => setMembers((current) => current.filter((item) => item.account !== member.account))}>移除</button></div>)}</div>
+        <div className="dataset-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setMemberOpen(false) }}>
+          <section className="dataset-modal member-modal member-modal-v2" role="dialog" aria-modal="true">
+            <div className="dataset-modal-title"><div><Users size={21} /><h2>管理成员</h2></div><button type="button" onClick={() => setMemberOpen(false)} aria-label="关闭"><X size={18} /></button></div>
+            <label className="member-search-field"><span>Member</span><Search size={18} /><input value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} placeholder="输入用户账号名" /></label>
+            <div className="member-add-row">
+              <select value={memberPermission} onChange={(event) => setMemberPermission(event.target.value as MemberPermission)}><option>可管理</option><option>可编辑</option><option>可使用</option></select>
+              <p>{permissionDescriptions[memberPermission]}</p>
+              <button type="button" onClick={addMember}><UserPlus size={16} />添加成员</button>
+            </div>
+            <div className="member-list member-list-v2">
+              {members.map((member) => (
+                <div key={member.account}>
+                  <span className="member-avatar">{member.name.slice(0, 1)}</span>
+                  <div><strong>{member.name}</strong><small>{member.account}</small></div>
+                  <select value={member.permission} onChange={(event) => setMembers((current) => current.map((item) => item.account === member.account ? { ...item, permission: event.target.value as MemberPermission } : item))}><option>可管理</option><option>可编辑</option><option>可使用</option></select>
+                  <button type="button" onClick={() => removeMember(member.account)}><Trash2 size={15} />移除</button>
+                </div>
+              ))}
+            </div>
           </section>
         </div>
       )}
 
       {uploadOpen && (
-        <div className="dataset-modal-overlay">
+        <div className="dataset-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setUploadOpen(false) }}>
           <form className="dataset-modal upload-corpus-modal" onSubmit={submitUpload}>
-            <div className="dataset-modal-title"><div><ArrowUpFromLine size={21} /><h2>上传语料</h2></div><button type="button" onClick={() => setUploadOpen(false)}><X size={18} /></button></div>
+            <div className="dataset-modal-title"><div><ArrowUpFromLine size={21} /><h2>上传语料</h2></div><button type="button" onClick={() => setUploadOpen(false)} aria-label="关闭"><X size={18} /></button></div>
             <label className="upload-license"><span>语料库文件许可协议</span><select required defaultValue=""><option value="" disabled>请选择许可协议</option><option>平台科研使用许可协议</option><option>署名共享许可协议</option><option>自定义授权协议</option></select></label>
             <div className="upload-mode-tabs"><button type="button" className={uploadMode === 'local' ? 'is-active' : ''} onClick={() => setUploadMode('local')}>本地上传</button><button type="button" className={uploadMode === 'external' ? 'is-active' : ''} onClick={() => setUploadMode('external')}>外部导入</button></div>
             {uploadMode === 'local' ? (
-              <div className="upload-drop-area"><FileArchive size={32} /><strong>选择需要上传的语料文件</strong><p>支持常见文本、表格、压缩包及多模态文件</p><div><button type="button" onClick={() => fileInputRef.current?.click()}><ArrowUpFromLine size={16} />上传文件</button><button type="button" onClick={() => folderInputRef.current?.click()}><FolderUp size={16} />上传文件夹</button></div><input ref={fileInputRef} hidden type="file" multiple /><input ref={(node) => { folderInputRef.current = node; node?.setAttribute('webkitdirectory', '') }} hidden type="file" multiple /></div>
+              <div className="upload-drop-area"><FileArchive size={32} /><strong>选择需要上传的语料文件</strong><p>上传后将发送给管理员审核</p><div><button type="button" onClick={() => fileInputRef.current?.click()}><ArrowUpFromLine size={16} />上传文件</button><button type="button" onClick={() => folderInputRef.current?.click()}><FolderUp size={16} />上传文件夹</button></div><input ref={fileInputRef} hidden type="file" multiple /><input ref={(node) => { folderInputRef.current = node; node?.setAttribute('webkitdirectory', '') }} hidden type="file" multiple /></div>
             ) : (
               <label className="github-import"><Github size={24} /><span>GitHub 仓库链接</span><input required placeholder="https://github.com/organization/repository" /></label>
             )}

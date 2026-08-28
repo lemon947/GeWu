@@ -302,12 +302,6 @@ function featureMetrics(index: number) {
   }
 }
 
-function opennessLabel(openness: string) {
-  if (openness === '开放共享') return '全部公开'
-  if (openness === '不公开' || openness === '暂不开放') return '不公开'
-  return '部分公开'
-}
-
 const subjectData = [
   {
     name: '数学',
@@ -425,7 +419,7 @@ export default function SubjectShowcase() {
               {featureSlides.map((feature, index) => (
                 <article className={index === activeFeature ? 'is-active' : ''} key={feature.title}>
                   <div className="subject-carousel-art" aria-hidden="true">
-                    <span className={`card-status-overlay ${opennessLabel(feature.openness) === '全部公开' ? 'is-open' : opennessLabel(feature.openness) === '不公开' ? 'is-closed' : 'is-partial'}`}>{opennessLabel(feature.openness)}</span>
+                    <span className="card-status-overlay is-partial">部分公开</span>
                     <span className="subject-art-line line-one" />
                     <span className="subject-art-line line-two" />
                     <span className="subject-art-node node-one" />
@@ -438,7 +432,7 @@ export default function SubjectShowcase() {
                   </div>
                   <div className="subject-carousel-meta-row">
                     <div className="subject-carousel-tags">
-                      {feature.tags.slice(0, 2).map((tag) => <small key={tag}>{tag}</small>)}
+                      {feature.tags.slice(0, 1).map((tag) => <small key={tag}>{tag}</small>)}
                     </div>
                     <time dateTime={feature.publishedAt}><CalendarDays size={14} />{feature.publishedAt}</time>
                   </div>

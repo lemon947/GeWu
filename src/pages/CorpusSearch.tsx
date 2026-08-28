@@ -742,7 +742,7 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
               return (
               <Link className="catalog-corpus-card" to={cardTarget} target="_blank" rel="noreferrer" key={item.id}>
                 <div className="quality-card-visual catalog-card-visual" aria-hidden="true">
-                  <span className={`card-status-overlay ${displayMeta.opennessLabel === '全部公开' ? 'is-open' : displayMeta.opennessLabel === '不公开' ? 'is-closed' : 'is-partial'}`}>{displayMeta.opennessLabel}</span>
+                  <span className="card-status-overlay is-partial">部分公开</span>
                   <span className="visual-line visual-line-one" />
                   <span className="visual-line visual-line-two" />
                   <span className="visual-node node-one" />
@@ -757,7 +757,6 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
                 <div className="catalog-card-meta-row">
                   <div className="catalog-card-tags">
                     <span className="catalog-subject-tag">{item.subject}</span>
-                    <span>{item.corpusType}</span>
                   </div>
                   <time dateTime={item.publishedAt}><CalendarDays size={13} />{item.publishedAt}</time>
                 </div>
