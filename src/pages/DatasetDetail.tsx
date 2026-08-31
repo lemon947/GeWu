@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronRight,
   Copy,
   Download,
   Eye,
@@ -16,8 +17,11 @@ import {
   FolderUp,
   Github,
   Info,
-  Mail,
   MessageCircle,
+  Maximize2,
+  Minimize2,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Search,
   Share2,
@@ -39,17 +43,32 @@ type UploadMode = 'local' | 'external'
 type MemberPermission = '可管理' | '可编辑' | '可使用'
 type CommentSort = 'time' | 'likes'
 
-const permissionDescriptions: Record<MemberPermission, string> = {
-  可管理: '可以管理成员、编辑和下载使用全部语料',
-  可编辑: '可编辑和下载使用全部语料',
-  可使用: '仅可下载使用全部语料',
-}
-
 const previewTree = [
-  { name: 'v1.2.0 / metadata.json', file: 'metadata.json' },
-  { name: 'v1.2.0 / sample.jsonl', file: 'sample.jsonl' },
-  { name: 'v1.1.0 / train.schema.json', file: 'schema.json' },
-  { name: 'v1.0.0 / README.md', file: 'README.md' },
+  { name: 'metadata.json', file: 'metadata.json', path: '元数据 / metadata.json' },
+  { name: 'sample.jsonl', file: 'sample.jsonl', path: '样例数据 / sample.jsonl' },
+  { name: 'train.schema.json', file: 'schema.json', path: '训练规范 / train.schema.json' },
+  { name: 'README.md', file: 'README.md', path: '说明文档 / README.md' },
+]
+
+const datasetVersions = [
+  { version: 'v1.2.0', note: '补充字段与质量记录', files: previewTree },
+  {
+    version: 'v1.1.0',
+    note: '补充元数据',
+    files: [
+      { name: 'metadata.json', file: 'metadata.json', path: '元数据 / metadata.json' },
+      { name: 'train.schema.json', file: 'schema.json', path: '训练规范 / train.schema.json' },
+      { name: 'quality-report.md', file: 'README.md', path: '质检报告 / quality-report.md' },
+    ],
+  },
+  {
+    version: 'v1.0.0',
+    note: '首次发布',
+    files: [
+      { name: 'README.md', file: 'README.md', path: '说明文档 / README.md' },
+      { name: 'sample.jsonl', file: 'sample.jsonl', path: '样例数据 / sample.jsonl' },
+    ],
+  },
 ]
 
 const previewContent: Record<string, string> = {
@@ -77,9 +96,9 @@ const previewContent: Record<string, string> = {
 }
 
 const commentsSeed = [
-  { id: 1, user: '林知远', date: '2026-08-18', likes: 24, text: '样例数据结构很清楚，适合快速接入模型评测流程，希望后续补充更多字段说明。' },
-  { id: 2, user: '医学语料联合实验室', date: '2026-08-12', likes: 18, text: '对科研问答和推理链训练很有帮助，下载目录划分也比较明确。' },
-  { id: 3, user: '陈明', date: '2026-08-02', likes: 31, text: '建议增加数据质量报告和版本间差异说明，方便长期引用。' },
+  { id: 1, user: '林知远', date: '2026-08-18', likes: 24, liked: false, text: '样例数据结构很清楚，适合快速接入模型评测流程，希望后续补充更多字段说明。' },
+  { id: 2, user: '医学语料联合实验室', date: '2026-08-12', likes: 18, liked: false, text: '对科研问答和推理链训练很有帮助，下载目录划分也比较明确。' },
+  { id: 3, user: '陈明', date: '2026-08-02', likes: 31, liked: false, text: '建议增加数据质量报告和版本间差异说明，方便长期引用。' },
 ]
 
 function detailOpennessLabel(openness: string) {
@@ -113,9 +132,21 @@ export default function DatasetDetail() {
   const [activeTab, setActiveTab] = useState<DetailTab>('intro')
   const [selectedFile, setSelectedFile] = useState('metadata.json')
   const [selectedDownloadFile, setSelectedDownloadFile] = useState('sample.jsonl')
+  const [selectedPreviewVersion, setSelectedPreviewVersion] = useState(datasetVersions[0].version)
+  const [selectedDownloadVersion, setSelectedDownloadVersion] = useState(datasetVersions[0].version)
+  const [expandedPreviewVersions, setExpandedPreviewVersions] = useState<string[]>([datasetVersions[0].version])
+  const [expandedDownloadVersions, setExpandedDownloadVersions] = useState<string[]>([datasetVersions[0].version])
+  const [previewSidebarCollapsed, setPreviewSidebarCollapsed] = useState(false)
+  const [downloadSidebarCollapsed, setDownloadSidebarCollapsed] = useState(false)
+  const [fullscreenBrowser, setFullscreenBrowser] = useState<DetailTab | null>(null)
   const [memberOpen, setMemberOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploadMode, setUploadMode] = useState<UploadMode>('local')
+  const [authorFollowed, setAuthorFollowed] = useState(false)
+  const [uploadVersion, setUploadVersion] = useState('current')
+  const [uploadRemark, setUploadRemark] = useState('')
+  const [uploadDataSelected, setUploadDataSelected] = useState(false)
+  const [externalSource, setExternalSource] = useState('')
   const [memberQuery, setMemberQuery] = useState('')
   const [memberPermission, setMemberPermission] = useState<MemberPermission>('可编辑')
   const [metadataFormat, setMetadataFormat] = useState<'JSON' | 'CSV'>('JSON')
@@ -200,6 +231,26 @@ export default function DatasetDetail() {
     notify(openness === '全部公开' ? '已开始下载全部数据' : '已开始下载公开数据')
   }
 
+  const downloadVersionCorpus = () => {
+    if (openness === '不公开') {
+      notify('该语料库暂时未公开，若需要可联系作者')
+      return
+    }
+    const version = datasetVersions.find((entry) => entry.version === selectedDownloadVersion) ?? datasetVersions[0]
+    const scope = openness === '全部公开' ? '全部数据' : '作者公开的数据'
+    downloadBlob(`${item.id}-${version.version}-all.json`, JSON.stringify({
+      corpus: item.title,
+      version: version.version,
+      scope,
+      files: version.files.map((file) => ({
+        name: file.name,
+        path: `${version.version} / ${file.path}`,
+        sample: previewContent[file.file],
+      })),
+    }, null, 2))
+    notify(`已开始下载 ${version.version} 全部数据`)
+  }
+
   const exportMetadata = () => {
     if (metadataFormat === 'CSV') {
       downloadBlob(`${item.id}-metadata.csv`, `字段,内容\n语料名称,${item.title}\n学科领域,${item.subject}\n开放程度,${openness}\n发布机构,${item.organization}`, 'text/csv;charset=utf-8')
@@ -226,7 +277,19 @@ export default function DatasetDetail() {
 
   const submitUpload = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    const hasData = uploadMode === 'local' ? uploadDataSelected : Boolean(externalSource.trim())
+    if (!hasData) {
+      notify('请选择要上传的数据')
+      return
+    }
+    if (!uploadRemark.trim()) {
+      notify('请填写备注')
+      return
+    }
     setUploadOpen(false)
+    setUploadDataSelected(false)
+    setExternalSource('')
+    setUploadRemark('')
     notify('语料已提交，等待管理员审核')
   }
 
@@ -234,15 +297,28 @@ export default function DatasetDetail() {
     event.preventDefault()
     const value = commentDraft.trim()
     if (!value) return
-    setComments((current) => [{ id: Date.now(), user: user?.account ?? '科学语料用户', date: new Date().toISOString().slice(0, 10), likes: 0, text: value }, ...current])
+    setComments((current) => [{ id: Date.now(), user: user?.account ?? '科学语料用户', date: new Date().toISOString().slice(0, 10), likes: 0, liked: false, text: value }, ...current])
     setCommentDraft('')
     setCommentComposerOpen(false)
     notify('评论已发布')
   }
 
+  const goBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
+    navigate('/search')
+  }
+
+  const toggleExpandedVersion = (target: string, mode: 'preview' | 'download') => {
+    const setter = mode === 'preview' ? setExpandedPreviewVersions : setExpandedDownloadVersions
+    setter((current) => current.includes(target) ? current.filter((item) => item !== target) : [...current, target])
+  }
+
   return (
     <main className="dataset-detail-page dataset-detail-v2">
-      <button className="dataset-back-button" type="button" onClick={() => navigate(-1)}><ArrowLeft size={17} />返回</button>
+      <button className="dataset-back-button" type="button" onClick={goBack}><ArrowLeft size={17} />返回</button>
 
       <div className="dataset-detail-layout dataset-detail-layout-v2">
         <section className="dataset-summary-card dataset-hero-card">
@@ -255,6 +331,9 @@ export default function DatasetDetail() {
                 <span className="is-open">{openness}</span>
                 <span className={`dataset-status ${displayMeta.status === '已上传' ? 'is-uploaded' : 'is-pending'}`}>{displayMeta.status}</span>
               </div>
+              <div className="dataset-author-line">
+                作者：张伟；李娜；王磊
+              </div>
             </div>
             <div className="dataset-admin-actions">
               <button type="button" onClick={() => ensureVerified(() => navigate(`/upload?edit=${item.id}`))}><Pencil size={15} />编辑</button>
@@ -263,30 +342,27 @@ export default function DatasetDetail() {
             </div>
           </div>
 
-          <div className="dataset-hero-meta-grid">
-            <div><span>发布机构</span><strong><Building2 size={16} />{item.organization} - {item.authors}</strong></div>
-            <div><span>发布时间</span><strong><CalendarDays size={16} />{item.publishedAt}</strong></div>
-            <div><span>更新时间</span><strong>{updatedAt}</strong></div>
-            <div><span>语料规模</span><strong>{displayMeta.corpusSize}</strong></div>
-            <div><span>存储容量</span><strong>{displayMeta.storageSize}</strong></div>
-          </div>
+          <dl className="dataset-hero-meta-list">
+            <div><dt>发布机构</dt><dd><Building2 size={16} />{item.organization} - {item.authors}</dd></div>
+            <div><dt>发布时间</dt><dd><CalendarDays size={16} />{item.publishedAt}</dd></div>
+            <div><dt>更新时间</dt><dd>{updatedAt}</dd></div>
+            <div><dt>语料规模</dt><dd>{displayMeta.corpusSize}</dd></div>
+            <div><dt>存储容量</dt><dd>{displayMeta.storageSize}</dd></div>
+          </dl>
 
-          <article className="dataset-description-block">
-            <h2>语料简介</h2>
-            <p>{item.summary}</p>
+          <article className="dataset-description-block dataset-description-actions-only">
+            <div className="dataset-social-actions dataset-social-actions-v2">
+              <span data-tooltip="浏览量"><Eye size={18} /><b>{item.views.toLocaleString()}</b></span>
+              <span data-tooltip="下载量"><Download size={18} /><b>{item.usage.toLocaleString()}</b></span>
+              <button type="button" data-tooltip={favorite ? '取消收藏' : '收藏'} className={favorite ? 'is-active' : ''} onClick={() => { toggleFavorite({ id: item.id, title: item.title }); notify(favorite ? '已取消收藏' : '已收藏，可在个人主页查看') }}><Star size={18} /><b>{(item.favorites + (favorite ? 1 : 0)).toLocaleString()}</b></button>
+              <button type="button" data-tooltip="转发" onClick={copyShareLink}><Share2 size={18} /></button>
+            </div>
           </article>
-
-          <div className="dataset-social-actions dataset-social-actions-v2">
-            <span><Eye size={17} />浏览量 <b>{item.views.toLocaleString()}</b></span>
-            <span><Download size={17} />下载量 <b>{item.usage.toLocaleString()}</b></span>
-            <button type="button" className={favorite ? 'is-active' : ''} onClick={() => { toggleFavorite({ id: item.id, title: item.title }); notify(favorite ? '已取消收藏' : '已收藏，可在个人主页查看') }}><Star size={17} />收藏 <b>{(item.favorites + (favorite ? 1 : 0)).toLocaleString()}</b></button>
-            <button type="button" onClick={copyShareLink}><Share2 size={17} />转发</button>
-          </div>
         </section>
 
         <aside className="dataset-side-column dataset-side-column-v2">
           <section className="dataset-side-card">
-            <div className="side-card-title"><Info size={18} /><h2>基本信息</h2></div>
+            <div className="side-card-title"><Info size={18} /><h2>其他信息</h2></div>
             <dl>
               <div><dt>语种类别</dt><dd>{languageForSubject(item.subject)}</dd></div>
               <div><dt>语料格式</dt><dd>{formatForSubject(item.subject)}</dd></div>
@@ -295,11 +371,23 @@ export default function DatasetDetail() {
           </section>
 
           <section className="dataset-side-card author-card">
-            <div className="author-avatar">{item.authors.slice(0, 1)}</div>
-            <div>
-              <h2>作者：{item.authors}</h2>
-              <p>{item.organization}</p>
-              <a href={`mailto:corpus@pku.edu.cn?subject=${encodeURIComponent(`申请使用：${item.title}`)}`}><Mail size={14} />联系作者</a>
+            <div className="author-card-main">
+              <div className="author-avatar">张</div>
+              <div className="author-card-copy">
+                <h2>张伟</h2>
+                <p>北京大学</p>
+              </div>
+              <button
+                className={authorFollowed ? 'is-followed' : ''}
+                data-tooltip={authorFollowed ? '取消关注' : undefined}
+                type="button"
+                onClick={() => {
+                  setAuthorFollowed((followed) => !followed)
+                  notify(authorFollowed ? '已取消关注' : '已关注作者')
+                }}
+              >
+                {authorFollowed ? '已关注' : '关注'}
+              </button>
             </div>
           </section>
 
@@ -348,13 +436,68 @@ export default function DatasetDetail() {
               <p>{item.summary} 平台围绕数据来源、结构化处理、质量校验和版本管理沉淀元数据，支持科研、教学和模型训练场景复用。</p>
               <div className="keyword-row">{item.keywords.map((keyword) => <span key={keyword}>{keyword}</span>)}</div>
             </section>
-            <section className="dataset-browser">
+            <section className={`dataset-browser ${previewSidebarCollapsed ? 'is-sidebar-collapsed' : ''} ${fullscreenBrowser === 'intro' ? 'is-fullscreen' : ''}`}>
               <aside>
-                <strong>语料预览</strong>
-                {previewTree.map((node) => <button type="button" className={selectedFile === node.file ? 'is-active' : ''} key={node.file} onClick={() => setSelectedFile(node.file)}><Folder size={15} />{node.name}</button>)}
+                <div className="dataset-browser-sidebar-head">
+                  <strong>语料预览</strong>
+                  <button type="button" aria-label="收起左栏目录" onClick={() => setPreviewSidebarCollapsed(true)}><PanelLeftClose size={17} /></button>
+                </div>
+                <div className="dataset-version-tree" aria-label="按版本浏览语料">
+                  {datasetVersions.map((version) => {
+                    const expanded = expandedPreviewVersions.includes(version.version)
+                    return (
+                      <div className="dataset-version-node" key={version.version}>
+                        <button
+                          className={selectedPreviewVersion === version.version ? 'is-active' : ''}
+                          onClick={() => {
+                            setSelectedPreviewVersion(version.version)
+                            toggleExpandedVersion(version.version, 'preview')
+                          }}
+                          type="button"
+                        >
+                          <ChevronDown className={expanded ? 'is-expanded' : ''} size={15} />
+                          <span>{version.version}</span>
+                          <small>{version.note}</small>
+                        </button>
+                        {expanded && version.files.map((node) => (
+                          <button
+                            className={`dataset-file-node ${selectedPreviewVersion === version.version && selectedFile === node.file ? 'is-active' : ''}`}
+                            key={`${version.version}-${node.file}`}
+                            onClick={() => {
+                              setSelectedPreviewVersion(version.version)
+                              setSelectedFile(node.file)
+                            }}
+                            type="button"
+                          >
+                            <Folder size={15} />{version.version} / {node.path}
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  })}
+                </div>
               </aside>
               <div className="preview-code-panel">
-                <div><span>{selectedFile}</span><small>历史版本样例数据</small></div>
+                <div className="dataset-code-toolbar">
+                  <div className="dataset-code-title">
+                    {previewSidebarCollapsed && <button className="dataset-sidebar-restore" type="button" aria-label="展开左栏目录" onClick={() => setPreviewSidebarCollapsed(false)}><PanelLeftOpen size={17} /></button>}
+                    <span>{selectedFile}</span>
+                  </div>
+                  <div className="dataset-code-actions">
+                    <button
+                      type="button"
+                      aria-label={fullscreenBrowser === 'intro' ? '缩小预览' : '放大预览'}
+                      onClick={() => setFullscreenBrowser((current) => current === 'intro' ? null : 'intro')}
+                    >
+                      {fullscreenBrowser === 'intro' ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                    </button>
+                    <button type="button" aria-label="切换下一个文件" onClick={() => {
+                      const version = datasetVersions.find((entry) => entry.version === selectedPreviewVersion) ?? datasetVersions[0]
+                      const index = version.files.findIndex((file) => file.file === selectedFile)
+                      setSelectedFile(version.files[(index + 1) % version.files.length].file)
+                    }}><ChevronRight size={20} /></button>
+                  </div>
+                </div>
                 <pre><code>{previewContent[selectedFile]}</code></pre>
               </div>
             </section>
@@ -366,13 +509,72 @@ export default function DatasetDetail() {
             {openness === '不公开' ? (
               <div className="private-dataset-note">该语料库暂时未公开，若需要可联系作者。</div>
             ) : (
-              <section className="dataset-browser">
+              <section className={`dataset-browser ${downloadSidebarCollapsed ? 'is-sidebar-collapsed' : ''} ${fullscreenBrowser === 'download' ? 'is-fullscreen' : ''}`}>
                 <aside>
-                  <strong>可下载目录</strong>
-                  {previewTree.map((node) => <button type="button" className={selectedDownloadFile === node.file ? 'is-active' : ''} key={node.file} onClick={() => setSelectedDownloadFile(node.file)}><Folder size={15} />{node.name}</button>)}
+                  <div className="dataset-browser-sidebar-head">
+                    <strong>可下载目录</strong>
+                    <button type="button" aria-label="收起左栏目录" onClick={() => setDownloadSidebarCollapsed(true)}><PanelLeftClose size={17} /></button>
+                  </div>
+                  <button className="download-version-button" type="button" onClick={downloadVersionCorpus}>
+                    <Download size={16} />下载 {selectedDownloadVersion} 全部数据
+                  </button>
+                  <div className="dataset-version-tree" aria-label="按版本下载语料">
+                    {datasetVersions.map((version) => {
+                      const expanded = expandedDownloadVersions.includes(version.version)
+                      return (
+                        <div className="dataset-version-node" key={version.version}>
+                          <button
+                            className={selectedDownloadVersion === version.version ? 'is-active' : ''}
+                            onClick={() => {
+                              setSelectedDownloadVersion(version.version)
+                              toggleExpandedVersion(version.version, 'download')
+                            }}
+                            type="button"
+                          >
+                            <ChevronDown className={expanded ? 'is-expanded' : ''} size={15} />
+                            <span>{version.version}</span>
+                            <small>{version.note}</small>
+                          </button>
+                          {expanded && version.files.map((node) => (
+                            <button
+                              className={`dataset-file-node ${selectedDownloadVersion === version.version && selectedDownloadFile === node.file ? 'is-active' : ''}`}
+                              key={`${version.version}-${node.file}`}
+                              onClick={() => {
+                                setSelectedDownloadVersion(version.version)
+                                setSelectedDownloadFile(node.file)
+                              }}
+                              type="button"
+                            >
+                              <Folder size={15} />{version.version} / {node.path}
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </aside>
                 <div className="preview-code-panel">
-                  <div><span>{selectedDownloadFile}</span><button type="button" onClick={downloadCorpus}><Download size={15} />下载</button></div>
+                  <div className="dataset-code-toolbar">
+                    <div className="dataset-code-title">
+                      {downloadSidebarCollapsed && <button className="dataset-sidebar-restore" type="button" aria-label="展开左栏目录" onClick={() => setDownloadSidebarCollapsed(false)}><PanelLeftOpen size={17} /></button>}
+                      <span>{selectedDownloadFile}</span>
+                    </div>
+                    <div className="dataset-code-actions">
+                      <button className="dataset-code-download" type="button" onClick={downloadCorpus}><Download size={19} />下载</button>
+                      <button
+                        type="button"
+                        aria-label={fullscreenBrowser === 'download' ? '缩小预览' : '放大预览'}
+                        onClick={() => setFullscreenBrowser((current) => current === 'download' ? null : 'download')}
+                      >
+                        {fullscreenBrowser === 'download' ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                      </button>
+                      <button type="button" aria-label="切换下一个文件" onClick={() => {
+                        const version = datasetVersions.find((entry) => entry.version === selectedDownloadVersion) ?? datasetVersions[0]
+                        const index = version.files.findIndex((file) => file.file === selectedDownloadFile)
+                        setSelectedDownloadFile(version.files[(index + 1) % version.files.length].file)
+                      }}><ChevronRight size={20} /></button>
+                    </div>
+                  </div>
                   <pre><code>{previewContent[selectedDownloadFile]}</code></pre>
                 </div>
               </section>
@@ -404,7 +606,14 @@ export default function DatasetDetail() {
                   <div>
                     <header><strong>{comment.user}</strong><span>{comment.date}</span></header>
                     <p>{comment.text}</p>
-                    <button type="button" onClick={() => setComments((current) => current.map((item) => item.id === comment.id ? { ...item, likes: item.likes + 1 } : item))}><ThumbsUp size={15} />{comment.likes}</button>
+                    <button
+                      className={comment.liked ? 'is-active' : ''}
+                      data-tooltip={comment.liked ? '取消点赞' : '点赞'}
+                      type="button"
+                      onClick={() => setComments((current) => current.map((item) => item.id === comment.id ? { ...item, liked: !item.liked, likes: item.liked ? Math.max(0, item.likes - 1) : item.likes + 1 } : item))}
+                    >
+                      <ThumbsUp size={15} />{comment.likes}
+                    </button>
                   </div>
                 </article>
               ))}
@@ -414,7 +623,7 @@ export default function DatasetDetail() {
       </section>
 
       <section className="related-datasets-section">
-        <header><h2>相关语料库</h2><Link to="/search/results">查看更多</Link></header>
+        <header><h2>相关语料库</h2></header>
         <div className="related-dataset-strip">
           {relatedRecords.map((record) => (
             <Link className="related-dataset-card" to={`/search/datasets/${record.id}`} key={record.id}>
@@ -430,10 +639,10 @@ export default function DatasetDetail() {
         <div className="dataset-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setMemberOpen(false) }}>
           <section className="dataset-modal member-modal member-modal-v2" role="dialog" aria-modal="true">
             <div className="dataset-modal-title"><div><Users size={21} /><h2>管理成员</h2></div><button type="button" onClick={() => setMemberOpen(false)} aria-label="关闭"><X size={18} /></button></div>
-            <label className="member-search-field"><span>Member</span><Search size={18} /><input value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} placeholder="输入用户账号名" /></label>
+            <div className="member-add-title">添加成员</div>
             <div className="member-add-row">
+              <label className="member-search-field"><Search size={18} /><input value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} placeholder="输入用户账号名" /></label>
               <select value={memberPermission} onChange={(event) => setMemberPermission(event.target.value as MemberPermission)}><option>可管理</option><option>可编辑</option><option>可使用</option></select>
-              <p>{permissionDescriptions[memberPermission]}</p>
               <button type="button" onClick={addMember}><UserPlus size={16} />添加成员</button>
             </div>
             <div className="member-list member-list-v2">
@@ -454,14 +663,16 @@ export default function DatasetDetail() {
         <div className="dataset-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setUploadOpen(false) }}>
           <form className="dataset-modal upload-corpus-modal" onSubmit={submitUpload}>
             <div className="dataset-modal-title"><div><ArrowUpFromLine size={21} /><h2>上传语料</h2></div><button type="button" onClick={() => setUploadOpen(false)} aria-label="关闭"><X size={18} /></button></div>
-            <label className="upload-license"><span>语料库文件许可协议</span><select required defaultValue=""><option value="" disabled>请选择许可协议</option><option>平台科研使用许可协议</option><option>署名共享许可协议</option><option>自定义授权协议</option></select></label>
-            <div className="upload-mode-tabs"><button type="button" className={uploadMode === 'local' ? 'is-active' : ''} onClick={() => setUploadMode('local')}>本地上传</button><button type="button" className={uploadMode === 'external' ? 'is-active' : ''} onClick={() => setUploadMode('external')}>外部导入</button></div>
+            <label className="upload-license is-required"><span>语料库文件许可协议</span><select required defaultValue=""><option value="" disabled>请选择许可协议</option><option>平台科研使用许可协议</option><option>署名共享许可协议</option><option>自定义授权协议</option></select></label>
+            <label className="upload-license is-required"><span>版本</span><select required value={uploadVersion} onChange={(event) => setUploadVersion(event.target.value)}><option value="current">当前最新版本</option>{datasetVersions.map((version) => <option value={version.version} key={version.version}>历史版本：{version.version}</option>)}</select></label>
+            <label className="upload-license is-required"><span>备注</span><textarea required value={uploadRemark} onChange={(event) => setUploadRemark(event.target.value)} placeholder="请填写本次上传内容说明、数据来源或变更备注" /></label>
+            <div className="upload-mode-tabs"><button type="button" className={uploadMode === 'local' ? 'is-active' : ''} onClick={() => { setUploadMode('local'); setExternalSource('') }}>本地上传</button><button type="button" className={uploadMode === 'external' ? 'is-active' : ''} onClick={() => { setUploadMode('external'); setUploadDataSelected(false) }}>外部导入</button></div>
             {uploadMode === 'local' ? (
-              <div className="upload-drop-area"><FileArchive size={32} /><strong>选择需要上传的语料文件</strong><p>上传后将发送给管理员审核</p><div><button type="button" onClick={() => fileInputRef.current?.click()}><ArrowUpFromLine size={16} />上传文件</button><button type="button" onClick={() => folderInputRef.current?.click()}><FolderUp size={16} />上传文件夹</button></div><input ref={fileInputRef} hidden type="file" multiple /><input ref={(node) => { folderInputRef.current = node; node?.setAttribute('webkitdirectory', '') }} hidden type="file" multiple /></div>
+              <div className="upload-drop-area"><FileArchive size={32} /><strong>{uploadDataSelected ? '已选择上传数据' : '选择需要上传的语料文件'}</strong><p>上传后将发送给管理员审核</p><div><button type="button" onClick={() => fileInputRef.current?.click()}><ArrowUpFromLine size={16} />上传文件</button><button type="button" onClick={() => folderInputRef.current?.click()}><FolderUp size={16} />上传文件夹</button></div><input ref={fileInputRef} hidden type="file" multiple onChange={(event) => setUploadDataSelected(Boolean(event.target.files?.length))} /><input ref={(node) => { folderInputRef.current = node; node?.setAttribute('webkitdirectory', '') }} hidden type="file" multiple onChange={(event) => setUploadDataSelected(Boolean(event.target.files?.length))} /></div>
             ) : (
-              <label className="github-import"><Github size={24} /><span>GitHub 仓库链接</span><input required placeholder="https://github.com/organization/repository" /></label>
+              <label className="github-import"><Github size={24} /><span>GitHub 仓库链接</span><input value={externalSource} onChange={(event) => setExternalSource(event.target.value)} placeholder="https://github.com/organization/repository" /></label>
             )}
-            <label className="upload-confirm"><input required type="checkbox" /><span>我已确认上传内容符合许可协议及平台合规要求</span></label>
+            <label className="upload-confirm is-required"><input required type="checkbox" /><span>我已确认上传内容符合许可协议及平台合规要求</span></label>
             <div className="dataset-modal-actions"><button type="button" onClick={() => setUploadOpen(false)}>取消</button><button type="submit" className="is-primary">提交审核</button></div>
           </form>
         </div>
