@@ -251,7 +251,7 @@ export default function Home() {
                 </div>
               </article>
             ))}
-            <Link className="demand-plaza-link" to="/search">
+            <Link className="demand-plaza-link" to="/demands">
               进入需求广场 <span aria-hidden="true">→</span>
             </Link>
           </div>

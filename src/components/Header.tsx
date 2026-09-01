@@ -8,6 +8,7 @@ const navItems = [
   { label: '首页', to: '/' },
   { label: '语料检索', to: '/search' },
   { label: '语料上传', to: '/upload' },
+  { label: '需求广场', to: '/demands' },
   { label: '工具链', to: '/tools' },
   { label: '关于我们', to: '/about' },
 ]
