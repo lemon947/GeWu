@@ -863,7 +863,11 @@ export default function DatasetDetail() {
                   )}
                 </>
               ) : (
-                <label className="github-import"><Github size={24} /><span>GitHub 仓库链接</span><input value={externalSource} onChange={(event) => setExternalSource(event.target.value)} placeholder="https://github.com/organization/repository" /></label>
+                <label className="github-import">
+                  <Github size={28} />
+                  <span>GitHub 仓库链接</span>
+                  <input value={externalSource} onChange={(event) => setExternalSource(event.target.value)} placeholder="https://github.com/organization/repository" />
+                </label>
               )}
             </section>
             <label className="upload-confirm is-required"><input required type="checkbox" /><span>我已确认上传内容符合许可协议及平台合规要求</span></label>

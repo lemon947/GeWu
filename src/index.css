@@ -4583,8 +4583,10 @@ body {
 .upload-file-card small { display: block; margin-top: 2px; color: #80919d; font-size: 10px; }
 .upload-file-card button { width: 32px; height: 32px; display: grid; place-items: center; color: #a15f5f; background: #fff; border: 1px solid #ead2d2; border-radius: 7px; cursor: pointer; }
 .upload-file-card button:hover { color: #8f3434; background: #fff5f5; }
-.github-import { min-height: 180px; padding: 28px; align-content: center; justify-items: center; background: #f8fafb; border: 1px solid #e0e8ec; border-radius: 10px; }
-.github-import input { width: min(480px, 100%); }
+.github-import { min-height: 180px; padding: 28px; display: grid !important; align-content: center; justify-items: center; gap: 10px; background: #f8fafb; border: 1px solid #e0e8ec; border-radius: 10px; }
+.github-import > svg { color: #278390; }
+.github-import span { color: #385666; font-size: 13px; font-weight: 800; }
+.github-import input { width: min(520px, 100%); }
 .upload-confirm { grid-template-columns: 18px 1fr !important; align-items: center; }
 .upload-confirm input { min-height: 0; }
 .dataset-toast { position: fixed; z-index: 240; left: 50%; bottom: 34px; transform: translateX(-50%); min-height: 44px; padding: 0 17px; display: flex; align-items: center; gap: 8px; color: #e8fbfd; background: #173b48; border: 1px solid #285968; border-radius: 8px; box-shadow: 0 13px 36px rgba(4, 25, 36, .24); font-size: 12px; }
