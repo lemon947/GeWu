@@ -2,21 +2,19 @@ import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction }
 import {
   ChevronLeft,
   ChevronRight,
-  CheckCircle2,
   Contact,
   Copy,
-  Edit3,
   Heart,
   ImagePlus,
   MessageCircle,
   Search,
   Send,
-  Trash2,
-  Upload,
   Star,
+  Upload,
   X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
+import { loadPublishedPosts } from '../data/demand-posts'
 
 export type DemandStatus = '招募中' | '共建中' | '已完成'
 type DemandTab = '综合排序' | '招募中' | '共建中' | '已完成'
@@ -153,7 +151,6 @@ const communityUsers: CommunityUser[] = [
 ]
 
 const demandTabs: DemandTab[] = ['综合排序', '招募中', '共建中', '已完成']
-const posterTemplates: Array<DemandPost['template']> = ['blue', 'mint', 'violet']
 
 function matchesDemand(demand: DemandPost, keyword: string) {
   const normalized = keyword.trim().toLocaleLowerCase('zh-CN')
@@ -185,15 +182,13 @@ export function DemandPoster({ demand, compact = false }: { demand: DemandPost; 
 
 export default function DemandSquare() {
   const navigate = useNavigate()
-  const [posts, setPosts] = useState(initialDemandPosts)
+  const [posts] = useState<DemandPost[]>(() => [...loadPublishedPosts(), ...initialDemandPosts])
   const [activeTab, setActiveTab] = useState<DemandTab>('综合排序')
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [isSearchPage, setIsSearchPage] = useState(false)
   const [searchTab, setSearchTab] = useState<SearchTab>('全部')
   const [selectedPost, setSelectedPost] = useState<DemandPost | null>(null)
-  const [showPublish, setShowPublish] = useState(false)
-  const [successPost, setSuccessPost] = useState<DemandPost | null>(null)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set())
   const [likedCommentIds, setLikedCommentIds] = useState<Set<string>>(new Set())
@@ -201,19 +196,6 @@ export default function DemandSquare() {
   const [showContact, setShowContact] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [toast, setToast] = useState('')
-  const [drafts, setDrafts] = useState<DemandPost[]>([])
-  const [showDrafts, setShowDrafts] = useState(false)
-  const [template, setTemplate] = useState<DemandPost['template']>('blue')
-  const [form, setForm] = useState({
-    title: '',
-    field: '',
-    corpusName: '',
-    content: '',
-    tags: '',
-    name: '',
-    unit: '',
-    email: '',
-  })
 
   const visiblePosts = useMemo(() => {
     const filteredByStatus = activeTab === '综合排序'
@@ -228,24 +210,6 @@ export default function DemandSquare() {
     return communityUsers.filter((user) => [user.name, user.role, user.organization]
       .some((value) => value.toLocaleLowerCase('zh-CN').includes(normalized)))
   }, [keyword])
-
-  const previewPost: DemandPost = {
-    id: 'preview',
-    title: form.title || '填写需求标题，生成文字需求卡片',
-    field: form.field || '应用领域 · 语料方向',
-    corpusName: form.corpusName || '语料名称',
-    author: form.name || '发布者',
-    organization: form.unit || '所在单位',
-    bio: '',
-    status: '招募中',
-    tags: form.tags.split(/[，,\s]+/).filter(Boolean).slice(0, 3),
-    content: form.content || '在这里补充需求背景、语料范围、样例数据、期望协作方式等信息。',
-    likes: 0,
-    bookmarks: 0,
-    comments: 0,
-    template,
-    contact: { name: form.name, unit: form.unit, email: form.email },
-  }
 
   const flashToast = (message: string) => {
     setToast(message)
@@ -266,64 +230,6 @@ export default function DemandSquare() {
       else next.add(id)
       return next
     })
-  }
-
-  const updateForm = (key: keyof typeof form, value: string) => {
-    setForm((current) => ({ ...current, [key]: value }))
-  }
-
-  const makePostFromForm = (): DemandPost | null => {
-    if (!form.title.trim() || !form.field.trim() || !form.corpusName.trim() || !form.content.trim() || !form.name.trim() || !form.unit.trim() || !form.email.trim()) {
-      flashToast('请补全必填信息')
-      return null
-    }
-    return {
-      ...previewPost,
-      id: `demand-${Date.now()}`,
-      title: form.title.trim(),
-      field: form.field.trim(),
-      corpusName: form.corpusName.trim(),
-      content: form.content.trim(),
-      author: form.name.trim(),
-      organization: form.unit.trim(),
-      tags: form.tags.split(/[，,\s]+/).filter(Boolean),
-      contact: { name: form.name.trim(), unit: form.unit.trim(), email: form.email.trim() },
-    }
-  }
-
-  const saveDraft = () => {
-    const draft = {
-      ...previewPost,
-      id: `draft-${Date.now()}`,
-      title: form.title.trim() || '未命名需求草稿',
-    }
-    setDrafts((current) => [draft, ...current])
-    flashToast('草稿已保存')
-  }
-
-  const publishPost = () => {
-    const nextPost = makePostFromForm()
-    if (!nextPost) return
-    setPosts((current) => [nextPost, ...current])
-    setSuccessPost(nextPost)
-    setShowPublish(false)
-    setForm({ title: '', field: '', corpusName: '', content: '', tags: '', name: '', unit: '', email: '' })
-  }
-
-  const continueDraft = (draft: DemandPost) => {
-    setForm({
-      title: draft.title,
-      field: draft.field,
-      corpusName: draft.corpusName,
-      content: draft.content,
-      tags: draft.tags.join('，'),
-      name: draft.author,
-      unit: draft.organization,
-      email: draft.contact.email,
-    })
-    setTemplate(draft.template)
-    setShowDrafts(false)
-    setShowPublish(true)
   }
 
   return (
@@ -379,7 +285,7 @@ export default function DemandSquare() {
               </div>
               <div>
                 <span>共 {visiblePosts.length} 条</span>
-                <button className="demand-primary-action" type="button" onClick={() => setShowPublish(true)}>
+                <button className="demand-primary-action" type="button" onClick={() => navigate('/demands/new')}>
                   + 发布需求
                 </button>
               </div>
@@ -523,81 +429,6 @@ export default function DemandSquare() {
                 <button type="button" onClick={() => { navigator.clipboard?.writeText(`${selectedPost.contact.name} ${selectedPost.contact.email}`); flashToast('联系方式已复制') }}><Copy size={15} />复制联系方式</button>
               </div>
             )}
-          </section>
-        </div>
-      )}
-
-      {showPublish && (
-        <div className="demand-modal-backdrop" role="presentation" onMouseDown={() => setShowPublish(false)}>
-          <section className="demand-publish-modal" role="dialog" aria-modal="true" aria-labelledby="demand-publish-title" onMouseDown={(event) => event.stopPropagation()}>
-            <button className="demand-modal-close" type="button" aria-label="关闭发布需求" onClick={() => setShowPublish(false)}><X /></button>
-            <header>
-              <div><Edit3 size={25} /><h2 id="demand-publish-title">发布需求</h2></div>
-              <button type="button" onClick={() => setShowDrafts(true)}>草稿箱 {drafts.length}</button>
-            </header>
-            <div className="demand-publish-layout">
-              <div className="demand-poster-builder">
-                <DemandPoster demand={previewPost} />
-                <div className="poster-template-switcher">
-                  {posterTemplates.map((item) => (
-                    <button className={template === item ? 'is-active' : ''} key={item} onClick={() => setTemplate(item)} type="button">模板 {item}</button>
-                  ))}
-                </div>
-                <button type="button" className="poster-upload"><ImagePlus size={18} />上传图片</button>
-                <p>推荐 1:1 图片比例，建议不低于 1080 x 1350 px。请勿上传无关、水印或侵权图片。</p>
-              </div>
-              <form className="demand-publish-form" onSubmit={(event) => { event.preventDefault(); publishPost() }}>
-                <label>应用领域*<input value={form.field} onChange={(event) => updateForm('field', event.target.value)} placeholder="如 化学化工 · 基地材料" /></label>
-                <label>语料名称*<input value={form.corpusName} onChange={(event) => updateForm('corpusName', event.target.value)} placeholder="请输入语料名称" /></label>
-                <label>需求标题*<input value={form.title} onChange={(event) => updateForm('title', event.target.value)} placeholder="请输入需求标题" /></label>
-                <label>帖子内容*<textarea value={form.content} onChange={(event) => updateForm('content', event.target.value)} placeholder="描述语料范围、样例数据、服务场景或协作方式" /></label>
-                <label>标签<input value={form.tags} onChange={(event) => updateForm('tags', event.target.value)} placeholder="用逗号分隔，如 科学数据，知识语料" /></label>
-                <div className="demand-contact-fields">
-                  <label>真实姓名*<input value={form.name} onChange={(event) => updateForm('name', event.target.value)} /></label>
-                  <label>所在单位*<input value={form.unit} onChange={(event) => updateForm('unit', event.target.value)} /></label>
-                  <label>电子邮箱*<input value={form.email} onChange={(event) => updateForm('email', event.target.value)} /></label>
-                </div>
-                <div className="demand-publish-actions">
-                  <button type="button" onClick={saveDraft}>保存草稿</button>
-                  <button type="button" onClick={() => setShowPublish(false)}>取消</button>
-                  <button type="submit">发布</button>
-                </div>
-              </form>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {showDrafts && (
-        <div className="demand-modal-backdrop" role="presentation" onMouseDown={() => setShowDrafts(false)}>
-          <section className="demand-draft-modal" role="dialog" aria-modal="true" aria-labelledby="demand-drafts-title" onMouseDown={(event) => event.stopPropagation()}>
-            <button className="demand-modal-close" type="button" aria-label="关闭草稿箱" onClick={() => setShowDrafts(false)}><X /></button>
-            <h2 id="demand-drafts-title">草稿箱</h2>
-            {drafts.length ? drafts.map((draft) => (
-              <article key={draft.id}>
-                <DemandPoster demand={draft} compact />
-                <div>
-                  <h3>{draft.title}</h3>
-                  <p>{draft.content}</p>
-                  <button type="button" onClick={() => continueDraft(draft)}>继续编辑</button>
-                  <button type="button" onClick={() => setDrafts((current) => current.filter((item) => item.id !== draft.id))}><Trash2 size={16} />删除</button>
-                </div>
-              </article>
-            )) : <p>暂无草稿</p>}
-          </section>
-        </div>
-      )}
-
-      {successPost && (
-        <div className="demand-modal-backdrop" role="presentation" onMouseDown={() => setSuccessPost(null)}>
-          <section className="demand-success-modal" role="dialog" aria-modal="true" aria-labelledby="demand-success-title" onMouseDown={(event) => event.stopPropagation()}>
-            <CheckCircle2 size={56} />
-            <h2 id="demand-success-title">发布成功</h2>
-            <p>需求已进入广场，可继续完善信息或邀请伙伴参与共建。</p>
-            <div>
-              <button type="button" onClick={() => { navigate(`/demands/${successPost.id}`); setSuccessPost(null) }}>查看发布</button>
-              <button type="button" onClick={() => { setSuccessPost(null); setShowPublish(true) }}>继续发布</button>
-            </div>
           </section>
         </div>
       )}

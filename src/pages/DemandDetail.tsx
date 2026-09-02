@@ -1,4 +1,4 @@
-import { useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import {
   ChevronLeft,
@@ -7,10 +7,13 @@ import {
   Copy,
   Heart,
   MessageCircle,
+  Share2,
   Star,
   X,
 } from 'lucide-react'
 import { DemandPoster, initialDemandPosts } from './DemandSquare'
+import { loadPublishedPosts } from '../data/demand-posts'
+import { useApp } from '../context/app-context'
 
 const comments = [
   {
@@ -55,18 +58,25 @@ function toggleSet(setter: Dispatch<SetStateAction<Set<string>>>, id: string) {
 export default function DemandDetail() {
   const navigate = useNavigate()
   const { id } = useParams()
-  const demand = useMemo(() => initialDemandPosts.find((item) => item.id === id) ?? initialDemandPosts[0], [id])
+  const demand = useMemo(() => {
+    const allPosts = [...loadPublishedPosts(), ...initialDemandPosts]
+    return allPosts.find((item) => item.id === id) ?? allPosts[0]
+  }, [id])
+  const { user } = useApp()
   const [showContact, setShowContact] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<string>>(new Set())
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set())
-  const [replyTo, setReplyTo] = useState('')
+  const [replyTo, setReplyTo] = useState<{ name: string; text: string } | null>(null)
   const [replyText, setReplyText] = useState('')
+  const [composerFocused, setComposerFocused] = useState(false)
   const [toast, setToast] = useState('')
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const liked = likedPosts.has(demand.id)
   const bookmarked = bookmarkedPosts.has(demand.id)
+  const composing = composerFocused || replyTo !== null
 
   const flashToast = (message: string) => {
     setToast(message)
@@ -81,17 +91,39 @@ export default function DemandDetail() {
     navigate('/demands')
   }
 
-  const startReply = (name: string) => {
-    setReplyTo(name)
-    setReplyText(`回复 @${name} `)
+  const startReply = (comment: { name: string; text: string }) => {
+    setReplyTo(comment)
+  }
+
+  const cancelCompose = () => {
+    setReplyTo(null)
+    setReplyText('')
+    setComposerFocused(false)
   }
 
   const sendReply = () => {
     if (!replyText.trim()) return
-    setReplyTo('')
+    const isReply = replyTo !== null
+    setReplyTo(null)
     setReplyText('')
-    flashToast('回复已发送')
+    setComposerFocused(false)
+    flashToast(isReply ? '回复已发送' : '评论已发布')
   }
+
+  const handleComposeBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    const next = event.relatedTarget
+    if (next instanceof Node && event.currentTarget.contains(next)) return
+    // 点击输入区外部：回复态整体取消，普通态仅收起面板，已输入内容保留
+    if (replyTo) {
+      setReplyTo(null)
+      setReplyText('')
+    }
+    setComposerFocused(false)
+  }
+
+  useEffect(() => {
+    if (replyTo) inputRef.current?.focus()
+  }, [replyTo])
 
   return (
     <div className="demand-detail-page">
@@ -139,6 +171,9 @@ export default function DemandDetail() {
                 <Contact size={17} />
                 联系方式
               </button>
+              <button className="demand-author-share" type="button" aria-label="转发帖子" onClick={() => { navigator.clipboard?.writeText(window.location.href); flashToast('已复制链接 可以转发') }}>
+                <Share2 size={18} />
+              </button>
             </div>
           </header>
 
@@ -157,7 +192,7 @@ export default function DemandDetail() {
                 <article className={comment.reply ? 'is-reply' : ''} key={comment.id}>
                   <div className="demand-avatar small"><span>{comment.avatar}</span></div>
                   <div>
-                    <p onClick={() => startReply(comment.name)}>
+                    <p onClick={() => startReply(comment)} onMouseDown={(event) => event.preventDefault()}>
                       <strong>{comment.name}</strong>
                       {comment.reply && <em>作者</em>}
                       {comment.text}
@@ -168,7 +203,7 @@ export default function DemandDetail() {
                         <Heart size={14} />
                         {comment.likes + (commentLiked ? 1 : 0)}
                       </button>
-                      <button type="button" onClick={() => startReply(comment.name)}>回复</button>
+                      <button type="button" onClick={() => startReply(comment)} onMouseDown={(event) => event.preventDefault()}>回复</button>
                     </footer>
                   </div>
                 </article>
@@ -176,35 +211,49 @@ export default function DemandDetail() {
             })}
           </section>
 
-          <footer className="demand-detail-bottom-bar">
-            <div className="demand-detail-reply-box">
-              <input
+          <footer className={`demand-detail-bottom-bar${composing ? ' is-composing' : ''}`}>
+            {replyTo && (
+              <div className="demand-reply-quote">
+                <p>回复 {replyTo.name}</p>
+                <span>{replyTo.text}</span>
+              </div>
+            )}
+            <div className={`demand-compose${composing ? ' is-expanded' : ''}`} onBlur={handleComposeBlur}>
+              <span className="demand-avatar small"><span>{user?.name.slice(0, 1) ?? '我'}</span></span>
+              <textarea
+                ref={inputRef}
+                rows={composing ? 3 : 1}
                 value={replyText}
                 maxLength={1000}
                 onChange={(event) => setReplyText(event.target.value)}
-                placeholder={replyTo ? `回复 @${replyTo}` : '说点什么...'}
+                onFocus={() => setComposerFocused(true)}
+                placeholder={replyTo ? '' : '说点什么...'}
               />
-              {replyTo && (
-                <div className="demand-reply-actions">
-                  <button type="button" onClick={() => { setReplyTo(''); setReplyText('') }}>取消</button>
-                  <button type="button" onClick={sendReply}>发送</button>
+              {composing && (
+                <div className="demand-compose-actions">
+                  <div className="demand-reply-actions">
+                    <button type="button" onClick={cancelCompose}>取消</button>
+                    <button type="button" onClick={sendReply}>发送</button>
+                  </div>
                 </div>
               )}
             </div>
-            <div className="demand-detail-social-actions">
-              <button className={liked ? 'is-active' : ''} type="button" onClick={() => toggleSet(setLikedPosts, demand.id)} aria-label="点赞">
-                <Heart size={19} />
-                {demand.likes + (liked ? 1 : 0)}
-              </button>
-              <button className={bookmarked ? 'is-active' : ''} type="button" onClick={() => toggleSet(setBookmarkedPosts, demand.id)} aria-label="收藏">
-                <Star size={19} />
-                {demand.bookmarks + (bookmarked ? 1 : 0)}
-              </button>
-              <button type="button" aria-label="评论">
-                <MessageCircle size={19} />
-                {demand.comments + 1}
-              </button>
-            </div>
+            {!composing && (
+              <div className="demand-detail-social-actions">
+                <button className={liked ? 'is-active' : ''} type="button" onClick={() => toggleSet(setLikedPosts, demand.id)} aria-label="点赞">
+                  <Heart size={19} />
+                  {demand.likes + (liked ? 1 : 0)}
+                </button>
+                <button className={bookmarked ? 'is-active' : ''} type="button" onClick={() => toggleSet(setBookmarkedPosts, demand.id)} aria-label="收藏">
+                  <Star size={19} />
+                  {demand.bookmarks + (bookmarked ? 1 : 0)}
+                </button>
+                <button type="button" aria-label="评论" onClick={() => { setComposerFocused(true); inputRef.current?.focus() }}>
+                  <MessageCircle size={19} />
+                  {demand.comments + 1}
+                </button>
+              </div>
+            )}
           </footer>
 
           {showContact && (

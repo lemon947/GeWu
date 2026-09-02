@@ -10,6 +10,9 @@ import CorpusUpload from './pages/CorpusUpload'
 import Profile from './pages/Profile'
 import DemandSquare from './pages/DemandSquare'
 import DemandDetail from './pages/DemandDetail'
+import DemandCreate from './pages/DemandCreate'
+import DemandPosterMaker from './pages/DemandPosterMaker'
+import DemandPostEditor from './pages/DemandPostEditor'
 import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
@@ -23,6 +26,9 @@ export default function App() {
         <Route path="/search/datasets/:id" element={<ProtectedRoute><DatasetDetail /></ProtectedRoute>} />
         <Route path="/upload" element={<CorpusUpload />} />
         <Route path="/demands" element={<DemandSquare />} />
+        <Route path="/demands/new" element={<DemandCreate />} />
+        <Route path="/demands/new/edit" element={<DemandPostEditor />} />
+        <Route path="/demands/new/poster" element={<DemandPosterMaker />} />
         <Route path="/demands/:id" element={<DemandDetail />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/tools" element={<ToolMarket />} />
