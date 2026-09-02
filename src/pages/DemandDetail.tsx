@@ -6,7 +6,6 @@ import {
   Contact,
   Copy,
   Heart,
-  MessageCircle,
   Share2,
   Star,
   X,
@@ -247,10 +246,6 @@ export default function DemandDetail() {
                 <button className={bookmarked ? 'is-active' : ''} type="button" onClick={() => toggleSet(setBookmarkedPosts, demand.id)} aria-label="收藏">
                   <Star size={19} />
                   {demand.bookmarks + (bookmarked ? 1 : 0)}
-                </button>
-                <button type="button" aria-label="评论" onClick={() => { setComposerFocused(true); inputRef.current?.focus() }}>
-                  <MessageCircle size={19} />
-                  {demand.comments + 1}
                 </button>
               </div>
             )}

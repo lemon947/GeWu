@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 
 type TextPoster = {
   id: string
@@ -30,7 +30,7 @@ const posterThemes = [
 export default function DemandPosterMaker() {
   const navigate = useNavigate()
   const [posters, setPosters] = useState<TextPoster[]>([
-    { id: 'poster-1', template: 0, title: '请邀请感兴趣的朋友一起共建语料库', subtitle: '简单介绍你的设想' },
+    { id: 'poster-1', template: 0, title: '', subtitle: '' },
   ])
   const [activeIndex, setActiveIndex] = useState(0)
   const [toast, setToast] = useState('')
@@ -47,6 +47,14 @@ export default function DemandPosterMaker() {
   const addBlank = () => {
     setPosters((current) => [...current, { id: `poster-${current.length + 1}`, template: 0, title: '', subtitle: '' }])
     setActiveIndex(posters.length)
+  }
+
+  const removePoster = (id: string) => {
+    setPosters((current) => {
+      const next = current.filter((item) => item.id !== id)
+      setActiveIndex((prev) => Math.min(prev, next.length - 1))
+      return next
+    })
   }
 
   const generate = () => {
@@ -78,6 +86,11 @@ export default function DemandPosterMaker() {
               <div className="poster-maker-track" style={{ transform: `translateX(${-activeIndex * 100}%)` }}>
                 {posters.map((item, index) => (
                   <div className={`poster-maker-slide${index === activeIndex ? ' is-active' : ''}`} key={item.id}>
+                    {index > 0 && (
+                      <button className="poster-maker-remove" type="button" aria-label="删除图片" onClick={() => removePoster(item.id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                     <div className="poster-preview" style={{ background: posterThemes[item.template] }}>
                       <span className="poster-preview-field">格物 · 语料共建</span>
                       <textarea

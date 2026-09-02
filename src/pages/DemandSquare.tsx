@@ -18,7 +18,7 @@ import { loadPublishedPosts } from '../data/demand-posts'
 
 export type DemandStatus = '招募中' | '共建中' | '已完成'
 type DemandTab = '综合排序' | '招募中' | '共建中' | '已完成'
-type SearchTab = '全部' | '用户'
+type SearchTab = '需求' | '用户'
 
 export type DemandPost = {
   id: string
@@ -187,10 +187,8 @@ export default function DemandSquare() {
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [isSearchPage, setIsSearchPage] = useState(false)
-  const [searchTab, setSearchTab] = useState<SearchTab>('全部')
+  const [searchTab, setSearchTab] = useState<SearchTab>('需求')
   const [selectedPost, setSelectedPost] = useState<DemandPost | null>(null)
-  const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
-  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set())
   const [likedCommentIds, setLikedCommentIds] = useState<Set<string>>(new Set())
   const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set(['user-chen']))
   const [showContact, setShowContact] = useState(false)
@@ -219,7 +217,7 @@ export default function DemandSquare() {
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setKeyword(searchInput.trim())
-    setSearchTab('全部')
+    setSearchTab('需求')
     setIsSearchPage(Boolean(searchInput.trim()))
   }
 
@@ -253,7 +251,7 @@ export default function DemandSquare() {
                 placeholder="多模态医疗语料"
                 value={searchInput}
               />
-              {searchInput && <button type="button" aria-label="清空搜索" onClick={() => { setSearchInput(''); setKeyword(''); setSearchTab('全部'); setIsSearchPage(false) }}><X size={17} /></button>}
+              {searchInput && <button type="button" aria-label="清空搜索" onClick={() => { setSearchInput(''); setKeyword(''); setSearchTab('需求'); setIsSearchPage(false) }}><X size={17} /></button>}
             </div>
             <button type="submit"><Search size={16} />搜索</button>
           </form>
@@ -268,7 +266,7 @@ export default function DemandSquare() {
 
         {isSearchPage && keyword && (
           <div className="demand-search-tabs" aria-label="搜索结果类型">
-            {(['全部', '用户'] as SearchTab[]).map((tab) => (
+            {(['需求', '用户'] as SearchTab[]).map((tab) => (
               <button className={searchTab === tab ? 'is-active' : ''} key={tab} onClick={() => setSearchTab(tab)} type="button">
                 {tab}
               </button>
@@ -276,7 +274,7 @@ export default function DemandSquare() {
           </div>
         )}
 
-        {searchTab === '全部' ? (
+        {searchTab === '需求' ? (
           <>
             <header className="demand-board-heading">
               <div>
@@ -303,16 +301,10 @@ export default function DemandSquare() {
                     </footer>
                   </div>
                 </button>
-                <div className="demand-post-actions">
-                  <button className={likedIds.has(post.id) ? 'is-active' : ''} type="button" onClick={() => toggleId(setLikedIds, post.id)}>
-                    <Heart size={17} />{post.likes + (likedIds.has(post.id) ? 1 : 0)}
-                  </button>
-                  <button className={bookmarkedIds.has(post.id) ? 'is-active' : ''} type="button" onClick={() => toggleId(setBookmarkedIds, post.id)}>
-                    <Star size={17} />{post.bookmarks + (bookmarkedIds.has(post.id) ? 1 : 0)}
-                  </button>
-                  <button type="button" onClick={() => navigate(`/demands/${post.id}`)}>
-                    <MessageCircle size={17} />{post.comments}
-                  </button>
+                <div className="demand-post-actions" aria-hidden="true">
+                  <span><Heart size={17} />{post.likes}</span>
+                  <span><Star size={17} />{post.bookmarks}</span>
+                  <span><MessageCircle size={17} />{post.comments}</span>
                 </div>
               </article>
             ))}
@@ -411,10 +403,6 @@ export default function DemandSquare() {
                   </div>
                   <label className="demand-reply-bar">
                     <input value={commentText} maxLength={1000} onChange={(event) => setCommentText(event.target.value)} placeholder="说点什么..." />
-                    <button className={likedIds.has(selectedPost.id) ? 'is-active' : ''} type="button" onClick={() => toggleId(setLikedIds, selectedPost.id)}><Heart size={17} />{selectedPost.likes + (likedIds.has(selectedPost.id) ? 1 : 0)}</button>
-                    <button className={bookmarkedIds.has(selectedPost.id) ? 'is-active' : ''} type="button" onClick={() => toggleId(setBookmarkedIds, selectedPost.id)}><Star size={17} />{selectedPost.bookmarks + (bookmarkedIds.has(selectedPost.id) ? 1 : 0)}</button>
-                    <button type="button" onClick={() => { setCommentText(''); flashToast('评论已发布') }}><MessageCircle size={17} />{selectedPost.comments + 1}</button>
-                    <button type="button" aria-label="转发帖子" onClick={() => { navigator.clipboard?.writeText(window.location.href); flashToast('已复制链接 可以转发') }}><Send size={17} /></button>
                   </label>
                 </div>
               </div>

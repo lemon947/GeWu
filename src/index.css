@@ -17656,3 +17656,48 @@ body {
   border-color: #2f6fe9;
   box-shadow: 0 0 0 3px rgba(47, 111, 233, .12);
 }
+
+/* Crop modal — keep footer visible above the fold */
+.demand-crop-modal {
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+.crop-stage {
+  height: min(58vh, 560px);
+  width: auto;
+  max-width: 100%;
+}
+
+/* Demand card actions — display only */
+.demand-square-page .demand-post-actions span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #6d7f94;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+/* Poster maker — remove added posters */
+.poster-maker-slide {
+  position: relative;
+}
+
+.poster-maker-remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 4;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: #43586f;
+  background: rgba(255, 255, 255, .94);
+  border: 1px solid #d8e4ef;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+}
