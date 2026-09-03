@@ -38,11 +38,11 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useApp } from '../context/app-context'
 import { corpusRecords, recordDisplayMeta } from './CorpusSearch'
 
-type DetailTab = 'intro' | 'usage' | 'download' | 'comments'
+type DetailTab = 'intro' | 'download' | 'comments'
 type UploadMode = 'local' | 'external'
-type MemberPermission = '可管理' | '可编辑'
+type MemberPermission = '可管理' | '可上传'
 type CommentSort = 'time' | 'likes'
-type DetailRole = 'admin' | 'editor' | 'guest'
+type DetailRole = 'admin' | 'uploader' | 'guest'
 type CommentReply = { id: number; user: string; date: string; text: string; replyingTo?: string }
 
 const previewTree = [
@@ -79,7 +79,7 @@ const previewContent: Record<string, string> = {
 const usageGuide = [
   {
     title: '1. 申请使用与协议签署',
-    content: '用户申请使用，需要先完成实名认证，并阅读、签署用户协议。用户协议签约归档且可用 Token 充足后，您可通过 SDK，使用实名认证时获取的 APIKey，按照以下指南使用语料。',
+    content: '用户申请使用，需要先阅读并签署用户协议。用户协议签约归档且可用 Token 充足后，您可通过 SDK，使用 APIKey 按照以下指南使用语料。',
   },
   { title: '2. Token 充值', content: '访问语料会消耗 Token。调用前，建议先确认可用 Token 是否充足；如 Token 不足，可进行充值。' },
   { title: '3. SDK 下载及安装', content: '本地调用前，需要安装 Python 环境和 corpusware SDK，并确保 Python 版本为 3.12 或更高版本。请将 corpusware_sdk-version.whl 替换为下载后的文件路径和文件名。', code: 'pip install corpusware_sdk-version.whl' },
@@ -92,11 +92,11 @@ const usageGuide = [
   { title: '10. 语料数据随机采样', content: '在探索阶段，可从语料件中随机抽取少量记录进行质量检查、字段熟悉和快速调试。正式批量读取前，建议先完成小样本验证。', code: 'samples = cw.sample_records(size=10, seed=42)\n\nfor sample in samples:\n    print(sample)' },
 ]
 
-const downloadExampleCode = `from corpusware_sdk import load_corpusware, login
+const buildDownloadExampleCode = (corpusId: string) => `from corpusware_sdk import load_corpusware, login
 
 login(token="YOUR_API_KEY")
 
-cw = load_corpusware(id="CHEM-CORPUS-K037")
+cw = load_corpusware(id="${corpusId}")
 
 print(cw.name)
 print(cw.abstract)
@@ -114,6 +114,94 @@ for row in cw.iter_records(limit=5):
         print(f"内容大小: {len(content)} bytes")
         text = content.decode("utf-8", errors="replace")
         print(text[:1000])`
+
+function crc32(data: Uint8Array): number {
+  let crc = 0xFFFFFFFF
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i]
+    for (let k = 0; k < 8; k++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1))
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0
+}
+
+function concatBytes(parts: Uint8Array[]): Uint8Array {
+  const total = parts.reduce((sum, part) => sum + part.length, 0)
+  const out = new Uint8Array(total)
+  let pos = 0
+  for (const part of parts) {
+    out.set(part, pos)
+    pos += part.length
+  }
+  return out
+}
+
+const zipU16 = (value: number) => new Uint8Array([value & 255, (value >>> 8) & 255])
+const zipU32 = (value: number) => new Uint8Array([value & 255, (value >>> 8) & 255, (value >>> 16) & 255, (value >>> 24) & 255])
+
+/** 生成最小可解压的 ZIP（store 无压缩）供前端直接下载 */
+function buildZip(files: Array<{ name: string; content: string }>): Blob {
+  const encoder = new TextEncoder()
+  const locals: Uint8Array[] = []
+  const centrals: Uint8Array[] = []
+  let offset = 0
+
+  for (const file of files) {
+    const name = encoder.encode(file.name)
+    const data = encoder.encode(file.content)
+    const crc = crc32(data)
+
+    const local = new Uint8Array(30 + name.length)
+    local.set([80, 75, 3, 4], 0)
+    local.set(zipU16(20), 4)
+    local.set(zipU16(0), 6)
+    local.set(zipU16(0), 8)
+    local.set(zipU16(0), 10)
+    local.set(zipU16(0), 12)
+    local.set(zipU32(crc), 14)
+    local.set(zipU32(data.length), 18)
+    local.set(zipU32(data.length), 22)
+    local.set(zipU16(name.length), 26)
+    local.set(zipU16(0), 28)
+    local.set(name, 30)
+    const full = concatBytes([local, data])
+    locals.push(full)
+
+    const central = new Uint8Array(46 + name.length)
+    central.set([80, 75, 1, 2], 0)
+    central.set(zipU16(20), 4)
+    central.set(zipU16(20), 6)
+    central.set(zipU16(0), 8)
+    central.set(zipU16(0), 10)
+    central.set(zipU16(0), 12)
+    central.set(zipU16(0), 14)
+    central.set(zipU32(crc), 16)
+    central.set(zipU32(data.length), 20)
+    central.set(zipU32(data.length), 24)
+    central.set(zipU16(name.length), 28)
+    central.set(zipU16(0), 30)
+    central.set(zipU16(0), 32)
+    central.set(zipU16(0), 34)
+    central.set(zipU16(0), 36)
+    central.set(zipU32(0), 38)
+    central.set(zipU32(offset), 42)
+    central.set(name, 46)
+    centrals.push(central)
+    offset += full.length
+  }
+
+  const centralSize = centrals.reduce((sum, part) => sum + part.length, 0)
+  const eocd = new Uint8Array(22)
+  eocd.set([80, 75, 5, 6], 0)
+  eocd.set(zipU16(0), 4)
+  eocd.set(zipU16(0), 6)
+  eocd.set(zipU16(files.length), 8)
+  eocd.set(zipU16(files.length), 10)
+  eocd.set(zipU32(centralSize), 12)
+  eocd.set(zipU32(offset), 16)
+  eocd.set(zipU16(0), 20)
+
+  return new Blob([concatBytes([...locals, ...centrals, eocd]).buffer as ArrayBuffer], { type: 'application/zip' })
+}
 
 const commentsSeed = [
   { id: 1, user: '林知远', date: '2026-08-18', likes: 24, liked: false, text: '样例数据结构很清楚，适合快速接入模型评测流程，希望后续补充更多字段说明。' },
@@ -148,9 +236,9 @@ const maxUploadBytes = 2 * 1024 * 1024 * 1024
 const maxUploadSizeLabel = '2GB'
 
 function detailOpennessLabel(openness: string) {
-  if (openness === '开放共享') return '全部公开'
+  if (openness === '开放共享') return '公开'
   if (openness === '不公开' || openness === '暂不开放') return '不公开'
-  return '部分公开'
+  return '公开'
 }
 
 function languageForSubject(subject: string) {
@@ -177,10 +265,12 @@ export default function DatasetDetail() {
   const { user, openAuth, favorites, toggleFavorite } = useApp()
   const item = corpusRecords.find((record) => record.id === id) ?? corpusRecords[0]
   const displayMeta = recordDisplayMeta(item)
-  const detailRole: DetailRole = item.id === 'math-01' ? 'admin' : item.id === 'physics-01' ? 'editor' : 'guest'
+  // 前三个语料库依次演示：管理员 / 可上传成员 / 非语料库成员
+  const firstThreeRoles: DetailRole[] = ['admin', 'uploader', 'guest']
+  const roleIndex = corpusRecords.findIndex((record) => record.id === item.id)
+  const detailRole: DetailRole = roleIndex >= 0 && roleIndex < firstThreeRoles.length ? firstThreeRoles[roleIndex] : 'guest'
   const openness = detailOpennessLabel(item.openness)
   const favorite = favorites.some((record) => record.id === item.id)
-  const verifiedKey = user ? `gw-realname-${user.account}` : 'gw-realname-guest'
 
   const [activeTab, setActiveTab] = useState<DetailTab>('intro')
   const [selectedFile, setSelectedFile] = useState('metadata.json')
@@ -197,7 +287,7 @@ export default function DatasetDetail() {
   const [uploadSizeError, setUploadSizeError] = useState('')
   const [externalSource, setExternalSource] = useState('')
   const [memberQuery, setMemberQuery] = useState('')
-  const [memberPermission, setMemberPermission] = useState<MemberPermission>('可编辑')
+  const [memberPermission, setMemberPermission] = useState<MemberPermission>('可上传')
   const [metadataFormat, setMetadataFormat] = useState<'JSON' | 'CSV'>('JSON')
   const [commentSort, setCommentSort] = useState<CommentSort>('time')
   const [commentDraft, setCommentDraft] = useState('')
@@ -207,14 +297,13 @@ export default function DatasetDetail() {
   const [replyTargetText, setReplyTargetText] = useState('')
   const [replyDraft, setReplyDraft] = useState('')
   const [commentReplies, setCommentReplies] = useState(repliesSeed)
-  const [joinPermission, setJoinPermission] = useState<MemberPermission>('可编辑')
+  const [joinPermission, setJoinPermission] = useState<MemberPermission>('可上传')
   const [joinRemark, setJoinRemark] = useState('')
   const [toast, setToast] = useState('')
-  const [verified, setVerified] = useState(() => window.localStorage.getItem(verifiedKey) === 'true')
   const [members, setMembers] = useState<Array<{ account: string; name: string; permission: MemberPermission }>>([
     { account: 'corpus_admin', name: '语料管理员', permission: '可管理' },
-    { account: 'corpus_editor01', name: '建设编辑', permission: '可编辑' },
-    { account: 'research_user02', name: '科研使用者', permission: '可编辑' },
+    { account: 'corpus_editor01', name: '建设编辑', permission: '可上传' },
+    { account: 'research_user02', name: '科研使用者', permission: '可上传' },
   ])
   const [comments, setComments] = useState(commentsSeed)
   const toastTimer = useRef<number | null>(null)
@@ -251,11 +340,6 @@ export default function DatasetDetail() {
       notify('请先登录后继续操作')
       return
     }
-    if (!verified) {
-      window.localStorage.setItem(verifiedKey, 'true')
-      setVerified(true)
-      notify('已完成演示实名认证')
-    }
     next()
   }
 
@@ -282,7 +366,7 @@ export default function DatasetDetail() {
       notify('该语料库暂时未公开，若需要可联系作者')
       return
     }
-    const scope = openness === '全部公开' ? '全部数据' : '作者公开的数据'
+    const scope = openness === '公开' ? '全部数据' : '作者公开的数据'
     downloadBlob(`${item.id}-${file}.json`, JSON.stringify({ corpus: item.title, scope, file, sample: previewContent[file] }, null, 2))
     notify('已开始下载当前样例数据')
   }
@@ -292,7 +376,7 @@ export default function DatasetDetail() {
       notify('该语料库暂时未公开，若需要可联系作者')
       return
     }
-    const scope = openness === '全部公开' ? '全部数据' : '作者公开的数据'
+    const scope = openness === '公开' ? '全部数据' : '作者公开的数据'
     downloadBlob(`${item.id}-latest-examples.json`, JSON.stringify({
       corpus: item.title,
       version: 'Version X',
@@ -307,13 +391,33 @@ export default function DatasetDetail() {
     notify('已开始下载全部样例数据')
   }
 
-  const copyDownloadCode = async () => {
+  const copyText = async (text: string, label: string) => {
     try {
-      await navigator.clipboard.writeText(downloadExampleCode)
-      notify('示例代码已复制')
+      await navigator.clipboard.writeText(text)
+      notify(label)
     } catch {
       notify('复制失败，请手动选择代码')
     }
+  }
+
+  const copyDownloadCode = () => copyText(buildDownloadExampleCode(item.id), '示例代码已复制')
+
+  const downloadZip = () => {
+    if (openness === '不公开') {
+      notify('该语料库暂时未公开，若需要可联系作者')
+      return
+    }
+    const blob = buildZip([
+      { name: 'README.md', content: `# ${item.title}\n\n${item.summary}\n\n版本：Version X · ${updatedAt}\n发布机构：${item.organization} - ${item.authors}` },
+      { name: 'metadata.json', content: JSON.stringify({ corpus: item.title, id: item.id, subject: item.subject, corpusType: item.corpusType, openness, publishedAt: item.publishedAt, updatedAt }, null, 2) },
+    ])
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${item.id}-latest.zip`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    notify('已开始下载语料压缩包')
   }
 
   const exportMetadata = () => {
@@ -383,7 +487,7 @@ export default function DatasetDetail() {
   const submitUpload = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!uploadLicense) {
-      notify('请选择授权方式')
+      notify('请选择许可协议')
       return
     }
     const hasData = uploadMode === 'local' ? uploadFiles.length > 0 : Boolean(externalSource.trim())
@@ -407,7 +511,10 @@ export default function DatasetDetail() {
   const submitComment = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const value = commentDraft.trim()
-    if (!value) return
+    if (!value) {
+      notify('请填写评论')
+      return
+    }
     setComments((current) => [{ id: Date.now(), user: user?.account ?? '科学语料用户', date: new Date().toISOString().slice(0, 10), likes: 0, liked: false, text: value }, ...current])
     setCommentDraft('')
     setCommentComposerOpen(false)
@@ -440,12 +547,12 @@ export default function DatasetDetail() {
     event.preventDefault()
     setJoinRequestOpen(false)
     setJoinRemark('')
-    setJoinPermission('可编辑')
+    setJoinPermission('可上传')
     notify('申请发送至管理员消息中心 等待审核')
   }
 
   const goEditUpload = () => {
-    ensureVerified(() => navigate(`/upload?edit=${item.id}`, { state: { mode: 'edit', corpus: item } }))
+    ensureVerified(() => navigate(`/search/datasets/${item.id}/edit`))
   }
 
   const goBack = () => {
@@ -476,17 +583,18 @@ export default function DatasetDetail() {
               </div>
             </div>
             <div className="dataset-admin-actions">
-              {(detailRole === 'admin' || detailRole === 'editor') && (
-                <button type="button" onClick={goEditUpload}><Pencil size={15} />编辑</button>
-              )}
               {detailRole === 'admin' && (
-                <button type="button" onClick={() => ensureVerified(() => setMemberOpen(true))}><Users size={15} />管理成员</button>
+                <>
+                  <button type="button" onClick={goEditUpload}><Pencil size={15} />编辑</button>
+                  <button type="button" onClick={() => ensureVerified(() => setMemberOpen(true))}><Users size={15} />管理成员</button>
+                  <button type="button" onClick={() => ensureVerified(() => navigate(`/search/datasets/${item.id}/audit`))}><ShieldCheck size={15} />审批</button>
+                </>
+              )}
+              {detailRole === 'uploader' && (
+                <button type="button" onClick={() => ensureVerified(() => setUploadOpen(true))}><Upload size={15} />上传</button>
               )}
               {detailRole === 'guest' && (
-                <>
-                  <button type="button" onClick={() => ensureVerified(() => setUploadOpen(true))}><Upload size={15} />上传</button>
-                  <button type="button" onClick={() => ensureVerified(() => setJoinRequestOpen(true))}><UserPlus size={15} />申请加入语料库</button>
-                </>
+                <button type="button" onClick={() => ensureVerified(() => setJoinRequestOpen(true))}><UserPlus size={15} />申请加入语料库</button>
               )}
             </div>
           </div>
@@ -544,7 +652,7 @@ export default function DatasetDetail() {
             <div className="side-card-title"><ShieldCheck size={18} /><h2>权益信息</h2></div>
             <dl>
               <div><dt>权益主体</dt><dd>{item.organization}</dd></div>
-              <div><dt>授权方式</dt><dd>CC BY 4.0</dd></div>
+              <div><dt>许可协议</dt><dd>CC BY 4.0</dd></div>
             </dl>
           </section>
 
@@ -564,7 +672,6 @@ export default function DatasetDetail() {
       <section className="dataset-content-panel dataset-content-panel-v2">
         <div className="dataset-content-tabs" role="tablist">
           <button type="button" className={activeTab === 'intro' ? 'is-active' : ''} onClick={() => setActiveTab('intro')}><FileText size={17} />语料介绍</button>
-          <button type="button" className={activeTab === 'usage' ? 'is-active' : ''} onClick={() => setActiveTab('usage')}><Info size={17} />使用说明</button>
           <button type="button" className={activeTab === 'download' ? 'is-active' : ''} onClick={() => setActiveTab('download')}><Download size={17} />语料下载</button>
           <button type="button" className={activeTab === 'comments' ? 'is-active' : ''} onClick={() => setActiveTab('comments')}><MessageCircle size={17} />评论（{comments.length}）</button>
         </div>
@@ -628,50 +735,84 @@ export default function DatasetDetail() {
           </div>
         )}
 
-        {activeTab === 'usage' && (
-          <div className="dataset-tab-body">
-            <section className="usage-guide-layout">
-              <nav className="usage-guide-toc" aria-label="使用说明目录">
-                {usageGuide.map((section, index) => (
-                  <a href={`#usage-guide-${index + 1}`} key={section.title}>{section.title}</a>
-                ))}
-              </nav>
-              <div className="usage-guide-panel">
-                {usageGuide.map((section, index) => (
-                  <article id={`usage-guide-${index + 1}`} key={section.title}>
-                    <h2>{section.title}</h2>
-                    <p>{section.content}</p>
-                    {section.code && <pre><code>{section.code}</code></pre>}
-                  </article>
-                ))}
-              </div>
-            </section>
-          </div>
-        )}
-
         {activeTab === 'download' && (
           <div className="dataset-tab-body">
             {openness === '不公开' ? (
               <div className="private-dataset-note">该语料库暂时未公开，若需要可联系作者。</div>
             ) : (
-              <section className={`download-code-section ${fullscreenBrowser === 'download' ? 'is-fullscreen' : ''}`}>
-                <div className="preview-code-panel">
-                  <div className="dataset-code-toolbar">
-                    <div className="dataset-code-title">
-                      <span>download_examples.py</span>
+              <section className="usage-guide-layout download-via-layout">
+                <nav className="usage-guide-toc" aria-label="下载方式目录">
+                  <a href="#download-zip">压缩包下载</a>
+                  <a href="#download-cli">CLI 命令行下载</a>
+                  <a href="#download-sdk">SDK 下载</a>
+                </nav>
+                <div className="usage-guide-panel">
+                  <article className="usage-guide-section" id="download-zip">
+                    <h2>压缩包下载</h2>
+                    <button className="dataset-zip-download" type="button" onClick={downloadZip}>
+                      <FileArchive size={20} />下载语料压缩包（{displayMeta.storageSize}）
+                    </button>
+                  </article>
+                  <article className="usage-guide-section" id="download-cli">
+                    <h2>CLI 命令行下载</h2>
+                    <p>在命令行中通过 CLI 工具下载完整数据集或单个文件，先通过如下命令安装。</p>
+                    <h3>安装 CLI 工具</h3>
+                    <div className="download-code-block">
+                      <div className="download-code-head">
+                        <button type="button" onClick={() => copyText('pip install corpusware-cli', '安装命令已复制')}><Copy size={15} />复制</button>
+                      </div>
+                      <pre><code>pip install corpusware-cli</code></pre>
                     </div>
-                    <div className="dataset-code-actions">
-                      <button className="dataset-code-download" type="button" onClick={copyDownloadCode}><Copy size={18} />复制代码</button>
-                      <button
-                        type="button"
-                        aria-label={fullscreenBrowser === 'download' ? '缩小预览' : '放大预览'}
-                        onClick={() => setFullscreenBrowser((current) => current === 'download' ? null : 'download')}
-                      >
-                        {fullscreenBrowser === 'download' ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-                      </button>
+                    <h3>下载完整数据集</h3>
+                    <div className="download-code-block">
+                      <div className="download-code-head">
+                        <button type="button" onClick={() => copyText(`corpusware login\ncorpusware download --corpus ${item.id} --output ./corpus`, '下载命令已复制')}><Copy size={15} />复制</button>
+                      </div>
+                      <pre><code>{`corpusware login
+corpusware download --corpus ${item.id} --output ./corpus`}</code></pre>
                     </div>
-                  </div>
-                  <pre><code>{downloadExampleCode}</code></pre>
+                    <h3>下载单个文件到指定本地文件夹（以下载 README.md 为例）</h3>
+                    <div className="download-code-block">
+                      <div className="download-code-head">
+                        <button type="button" onClick={() => copyText(`corpusware download --corpus ${item.id} --file README.md --output ./corpus`, '下载命令已复制')}><Copy size={15} />复制</button>
+                      </div>
+                      <pre><code>{`corpusware download --corpus ${item.id} --file README.md --output ./corpus`}</code></pre>
+                    </div>
+                    <p>更多更丰富的命令行下载选项，可参见 具体文档。</p>
+                  </article>
+                  <article className="usage-guide-section" id="download-sdk">
+                    <h2>SDK 下载</h2>
+                    <p>在 Python 环境中安装官方 SDK，按照以下步骤完成登录、鉴权并加载语料件。</p>
+                    {usageGuide.map((section, index) => (
+                      <article className="usage-guide-step" id={`usage-guide-${index + 1}`} key={section.title}>
+                        <h3>{section.title}</h3>
+                        <p>{section.content}</p>
+                        {section.code && <pre><code>{section.code}</code></pre>}
+                      </article>
+                    ))}
+                    <h3>完整的下载示例代码</h3>
+                    <p>以下代码可直接复制使用，其中语料 ID 为当前语料库标识。</p>
+                    <section className={`download-code-section ${fullscreenBrowser === 'download' ? 'is-fullscreen' : ''}`}>
+                      <div className="preview-code-panel">
+                        <div className="dataset-code-toolbar">
+                          <div className="dataset-code-title">
+                            <span>download_examples.py</span>
+                          </div>
+                          <div className="dataset-code-actions">
+                            <button className="dataset-code-download" type="button" onClick={copyDownloadCode}><Copy size={18} />复制代码</button>
+                            <button
+                              type="button"
+                              aria-label={fullscreenBrowser === 'download' ? '缩小预览' : '放大预览'}
+                              onClick={() => setFullscreenBrowser((current) => current === 'download' ? null : 'download')}
+                            >
+                              {fullscreenBrowser === 'download' ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                            </button>
+                          </div>
+                        </div>
+                        <pre><code>{buildDownloadExampleCode(item.id)}</code></pre>
+                      </div>
+                    </section>
+                  </article>
                 </div>
               </section>
             )}
@@ -691,7 +832,7 @@ export default function DatasetDetail() {
             </div>
             {commentComposerOpen && (
               <form className="comment-composer" onSubmit={submitComment}>
-                <textarea maxLength={1000} required value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="请输入评论内容，最多1000字" />
+                <textarea maxLength={1000} value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="请输入评论内容，最多1000字" />
                 <button type="submit">发布评论</button>
               </form>
             )}
@@ -795,7 +936,7 @@ export default function DatasetDetail() {
             <div className="member-add-title">添加成员</div>
             <div className="member-add-row">
               <label className="member-search-field"><Search size={18} /><input value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} placeholder="输入用户账号名" /></label>
-              <select value={memberPermission} onChange={(event) => setMemberPermission(event.target.value as MemberPermission)}><option>可管理</option><option>可编辑</option></select>
+              <select value={memberPermission} onChange={(event) => setMemberPermission(event.target.value as MemberPermission)}><option>可管理</option><option>可上传</option></select>
               <button type="button" onClick={addMember}><UserPlus size={16} />添加成员</button>
             </div>
             <div className="member-list member-list-v2">
@@ -803,7 +944,7 @@ export default function DatasetDetail() {
                 <div key={member.account}>
                   <span className="member-avatar">{member.name.slice(0, 1)}</span>
                   <div><strong>{member.name}</strong><small>{member.account}</small></div>
-                  <select value={member.permission} onChange={(event) => setMembers((current) => current.map((item) => item.account === member.account ? { ...item, permission: event.target.value as MemberPermission } : item))}><option>可管理</option><option>可编辑</option></select>
+                  <select value={member.permission} onChange={(event) => setMembers((current) => current.map((item) => item.account === member.account ? { ...item, permission: event.target.value as MemberPermission } : item))}><option>可管理</option><option>可上传</option></select>
                   <button type="button" onClick={() => removeMember(member.account)}><Trash2 size={15} />移除</button>
                 </div>
               ))}
@@ -827,7 +968,7 @@ export default function DatasetDetail() {
                 <span>申请权限</span>
                 <select value={joinPermission} onChange={(event) => setJoinPermission(event.target.value as MemberPermission)}>
                   <option>可管理</option>
-                  <option>可编辑</option>
+                  <option>可上传</option>
                 </select>
               </label>
               <textarea maxLength={1000} value={joinRemark} onChange={(event) => setJoinRemark(event.target.value)} placeholder="添加备注（选填）" />
@@ -841,7 +982,7 @@ export default function DatasetDetail() {
         <div className="dataset-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setUploadOpen(false) }}>
           <form className="dataset-modal upload-corpus-modal" onSubmit={submitUpload}>
             <div className="dataset-modal-title"><div><ArrowUpFromLine size={21} /><h2>上传语料</h2></div><button type="button" onClick={() => setUploadOpen(false)} aria-label="关闭"><X size={18} /></button></div>
-            <label className="upload-license is-required"><span>授权方式</span><select required value={uploadLicense} onChange={(event) => setUploadLicense(event.target.value)}><option value="" disabled>请选择授权方式</option>{uploadLicenseOptions.map((option) => <option value={option} key={option}>{option}</option>)}</select></label>
+            <label className="upload-license is-required"><span>许可协议</span><select required value={uploadLicense} onChange={(event) => setUploadLicense(event.target.value)}><option value="" disabled>请选择许可协议</option>{uploadLicenseOptions.map((option) => <option value={option} key={option}>{option}</option>)}</select></label>
             <label className="upload-license is-required"><span>备注</span><textarea required value={uploadRemark} onChange={(event) => setUploadRemark(event.target.value)} placeholder="请填写本次上传内容说明、数据来源或变更备注" /></label>
             <section className="upload-data-section is-required">
               <span>上传数据</span>

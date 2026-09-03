@@ -13,6 +13,7 @@ import {
   Trash2,
   UploadCloud,
   UserRound,
+  X,
 } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useApp } from '../context/app-context'
@@ -22,15 +23,15 @@ type Author = { name: string; contact: string; organization: string }
 type UploadGroupKey = 'sample' | 'public' | 'all'
 type UploadGroupState = { mode: 'local' | 'github'; files: string[]; github: string }
 
-const subjects = ['数学', '物理', '化学', '天文', '地理', '生物']
-const subjectChildren: Record<string, string[]> = {
+export const subjects = ['数学', '物理', '化学', '天文', '地理', '生物']
+export const subjectChildren: Record<string, string[]> = {
   化学: ['碳材料', 'f族元素', '生物医药', '能源材料', '催化', '教育教学'],
   地理: ['地球世界模型', '地表环境与城市', '教育教学'],
   生物: ['生命', '医学'],
 }
-const universities = ['北京大学', '清华大学', '复旦大学', '上海交通大学', '南京大学', '武汉大学', '厦门大学', '其他']
-const pkuDepartments = ['数学科学学院', '物理学院', '化学与分子工程学院', '天文学院-科维理天文与天体物理研究所', '环境科学与工程学院', '城市与环境学院', '地球与空间科学学院', '遥感与地理信息系统研究所', '北京未来基因诊断高精尖创新中心', '生命科学学院', '药学院', '健康医疗大数据国家研究院', '护理学院', '其他']
-const provinces = ['北京市', '天津市', '河北省', '山西省', '内蒙古自治区', '辽宁省', '吉林省', '黑龙江省', '上海市', '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省', '河南省', '湖北省', '湖南省', '广东省', '广西壮族自治区', '海南省', '重庆市', '四川省', '贵州省', '云南省', '西藏自治区', '陕西省', '甘肃省', '青海省', '宁夏回族自治区', '新疆维吾尔自治区']
+export const universities = ['北京大学', '清华大学', '复旦大学', '上海交通大学', '南京大学', '武汉大学', '厦门大学', '其他']
+export const pkuDepartments = ['数学科学学院', '物理学院', '化学与分子工程学院', '天文学院-科维理天文与天体物理研究所', '环境科学与工程学院', '城市与环境学院', '地球与空间科学学院', '遥感与地理信息系统研究所', '北京未来基因诊断高精尖创新中心', '生命科学学院', '药学院', '健康医疗大数据国家研究院', '护理学院', '其他']
+export const provinces = ['北京市', '天津市', '河北省', '山西省', '内蒙古自治区', '辽宁省', '吉林省', '黑龙江省', '上海市', '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省', '河南省', '湖北省', '湖南省', '广东省', '广西壮族自治区', '海南省', '重庆市', '四川省', '贵州省', '云南省', '西藏自治区', '陕西省', '甘肃省', '青海省', '宁夏回族自治区', '新疆维吾尔自治区']
 
 const emptyAuthor = (): Author => ({ name: '', contact: '', organization: '' })
 const emptyUpload = (): UploadGroupState => ({ mode: 'local', files: [], github: '' })
@@ -60,13 +61,13 @@ export default function CorpusUpload() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const editRecord = useMemo(() => corpusRecords.find((item) => item.id === searchParams.get('edit')), [searchParams])
-  const verifiedKey = user ? `gw-realname-${user.account}` : 'gw-realname-guest'
-  const verified = Boolean(user && window.localStorage.getItem(verifiedKey) === 'true')
   const [step, setStep] = useState(1)
   const [toast, setToast] = useState('')
   const [authors, setAuthors] = useState<Author[]>([emptyAuthor()])
   const [corpusName, setCorpusName] = useState(editRecord?.title ?? '')
   const [introduction, setIntroduction] = useState(editRecord?.summary ?? '')
+  const [keywordInput, setKeywordInput] = useState('')
+  const [keywords, setKeywords] = useState<string[]>(editRecord?.keywords ?? [])
   const [dataSource, setDataSource] = useState(editRecord ? '高校专业教材、科研文献、课程资源及经专家校验的领域数据' : '')
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(editRecord ? [editRecord.subject] : [])
   const [selectedChildren, setSelectedChildren] = useState<Record<string, string[]>>(() => editRecord && subjectChildren[editRecord.subject] ? { [editRecord.subject]: subjectChildren[editRecord.subject] } : {})
@@ -78,7 +79,9 @@ export default function CorpusUpload() {
   const [customDepartment, setCustomDepartment] = useState('')
   const [province, setProvince] = useState('')
   const [corpusSize, setCorpusSize] = useState('')
+  const [corpusSizeDetail, setCorpusSizeDetail] = useState('')
   const [storageSize, setStorageSize] = useState('')
+  const [storageSizeDetail, setStorageSizeDetail] = useState('')
   const [supplyStatus, setSupplyStatus] = useState('')
   const [supplyMode, setSupplyMode] = useState('')
   const [license, setLicense] = useState('')
@@ -95,6 +98,21 @@ export default function CorpusUpload() {
   }
 
   const updateAuthor = (index: number, key: keyof Author, value: string) => setAuthors((current) => current.map((author, position) => position === index ? { ...author, [key]: value } : author))
+
+  const addKeyword = () => {
+    const value = keywordInput.trim()
+    if (!value) return
+    if (keywords.includes(value)) {
+      setKeywordInput('')
+      return
+    }
+    if (keywords.length >= 10) {
+      notify('最多添加 10 个关键词')
+      return
+    }
+    setKeywords((current) => [...current, value])
+    setKeywordInput('')
+  }
   const updateUpload = (key: UploadGroupKey, value: UploadGroupState) => setUploads((current) => ({ ...current, [key]: value }))
 
   const toggleSubject = (subject: string) => {
@@ -112,7 +130,7 @@ export default function CorpusUpload() {
 
   const saveDraft = () => {
     if (!user) return
-    window.localStorage.setItem(`gw-upload-draft-${user.account}`, JSON.stringify({ authors, corpusName, introduction, dataSource, selectedSubjects, selectedChildren, corpusType, orgType, organization, department, customOrganization, customDepartment, province, corpusSize, storageSize, supplyStatus, supplyMode, license, openness, uploads, step }))
+    window.localStorage.setItem(`gw-upload-draft-${user.account}`, JSON.stringify({ authors, corpusName, introduction, keywords, dataSource, selectedSubjects, selectedChildren, corpusType, orgType, organization, department, customOrganization, customDepartment, province, corpusSize, corpusSizeDetail, storageSize, storageSizeDetail, supplyStatus, supplyMode, license, openness, uploads, step }))
     notify('当前内容已保存')
   }
 
@@ -145,10 +163,10 @@ export default function CorpusUpload() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  if (!user || !verified) {
+  if (!user) {
     return (
       <main className="corpus-upload-page upload-access-page">
-        <div className="upload-access-card"><ShieldCheck size={42} /><h1>上传语料库</h1><h2>{user ? '请先完成实名认证' : '请先登录平台'}</h2><p>上传和下载语料均需完成实名认证，以保障语料权属清晰、操作可追溯。</p>{user ? <Link to="/profile">前往个人主页认证</Link> : <button type="button" onClick={() => openAuth('/upload')}>登录平台</button>}</div>
+        <div className="upload-access-card"><ShieldCheck size={42} /><h1>上传语料库</h1><h2>请先登录平台</h2><p>登录后可上传语料库，以保障语料权属清晰、操作可追溯。</p><button type="button" onClick={() => openAuth('/upload')}>登录平台</button></div>
       </main>
     )
   }
@@ -175,7 +193,13 @@ export default function CorpusUpload() {
                   <div className="upload-section-title"><div><FileText size={18} /><h3>语料库信息</h3></div></div>
                   <div className="upload-field-grid">
                     <label className="is-wide corpus-name-field"><span>语料库名称 *</span><input required value={corpusName} onChange={(event) => setCorpusName(event.target.value)} placeholder="请填写语料库的名称，如天然产物" />{nameSuggestions.length > 0 && <div className="corpus-name-suggestions"><small>发现已有语料库</small>{nameSuggestions.map((item) => <button type="button" key={item.id} onClick={() => setCorpusName(item.title)}>{item.title}<ChevronRight size={14} /></button>)}</div>}</label>
-                    <div className="is-wide example-field-row"><label><span>语料库介绍 *</span><textarea required value={introduction} onChange={(event) => setIntroduction(event.target.value)} placeholder="请给出语料库的简要介绍" /></label><aside><strong>填写样例</strong><p>该数据集面向天然产物结构信息整理，记录分子结构及相关基础信息，可支撑天然产物识别、检索和药物发现研究。来源于北京大学相关课题组自建数据，主要服务模型后训练、知识增强和检索应用。</p><small>以上仅供参考，请使用一个或多个自然段组织提交。</small></aside></div>
+                    <div className="is-wide example-field-row"><label><span>语料库摘要 *</span><textarea required value={introduction} onChange={(event) => setIntroduction(event.target.value)} placeholder="请给出语料库的简要介绍" /></label><aside><strong>填写样例</strong><p>该数据集面向天然产物结构信息整理，记录分子结构及相关基础信息，可支撑天然产物识别、检索和药物发现研究。来源于北京大学相关课题组自建数据，主要服务模型后训练、知识增强和检索应用。</p><small>以上仅供参考，请使用一个或多个自然段组织提交。</small></aside></div>
+                    <label className="is-wide"><span>语料库关键词</span>
+                    <div className="keyword-box">
+                      <input value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addKeyword() } }} placeholder="输入后按回车添加，最多 10 个关键词" />
+                      {keywords.length > 0 && <div className="keyword-chips">{keywords.map((keyword) => <span key={keyword}>{keyword}<button type="button" aria-label={`删除关键词 ${keyword}`} onClick={() => setKeywords((current) => current.filter((item) => item !== keyword))}><X size={11} /></button></span>)}</div>}
+                    </div>
+                    </label>
                     <div className="is-wide example-field-row"><label><span>语料库主要数据来源 *</span><textarea required value={dataSource} onChange={(event) => setDataSource(event.target.value)} placeholder="请说明语料库的主要数据来源" /></label><aside><strong>填写样例</strong><p>北京大学出版社、北京大学101计划、科学出版社、高等教育出版社；数学各二级学科教材；分类参考：GB/T 13745、NSFC数学学科分类。</p><small>以上仅供参考，请根据实际语料库建设的数据来源填写。</small></aside></div>
                   </div>
 
@@ -190,8 +214,8 @@ export default function CorpusUpload() {
                     {organization === '其他' && <label><span>其他机构名称 *</span><input required value={customOrganization} onChange={(event) => setCustomOrganization(event.target.value)} placeholder="请输入机构名称" /></label>}
                     {department === '其他' && <label><span>其他院系名称 *</span><input required value={customDepartment} onChange={(event) => setCustomDepartment(event.target.value)} placeholder="请输入院系名称" /></label>}
                     <label><span>发布机构所在省份 *</span><select required value={province} onChange={(event) => setProvince(event.target.value)}><option value="">请选择省份</option>{provinces.map((item) => <option key={item}>{item}</option>)}</select></label>
-                    <label><span>语料规模 *</span><select required value={corpusSize} onChange={(event) => setCorpusSize(event.target.value)}><option value="">请选择</option>{['1千以下', '1千-1万', '1万-10万', '10万-100万', '100万以上'].map((item) => <option key={item}>{item}</option>)}</select></label>
-                    <label><span>存储容量 *</span><select required value={storageSize} onChange={(event) => setStorageSize(event.target.value)}><option value="">请选择</option>{['<500GB', '500GB-1TB', '1-2TB', '>2TB'].map((item) => <option key={item}>{item}</option>)}</select></label>
+                    <div className="upload-size-cell"><label><span>语料规模 *</span><select required value={corpusSize} onChange={(event) => setCorpusSize(event.target.value)}><option value="">请选择</option>{['1千以下', '1千-1万', '1万-10万', '10万-100万', '100万以上'].map((item) => <option key={item}>{item}</option>)}</select></label>{corpusSize && <input value={corpusSizeDetail} onChange={(event) => setCorpusSizeDetail(event.target.value)} placeholder="请填写具体语料条数如1000" />}</div>
+                    <div className="upload-size-cell"><label><span>存储容量 *</span><select required value={storageSize} onChange={(event) => setStorageSize(event.target.value)}><option value="">请选择</option>{['<500GB', '500GB-1TB', '1-2TB', '>2TB'].map((item) => <option key={item}>{item}</option>)}</select></label>{storageSize && <input value={storageSizeDetail} onChange={(event) => setStorageSizeDetail(event.target.value)} placeholder="请填写具体语料规模如15GB" />}</div>
                     <label><span>对外供给情况 *</span><select required value={supplyStatus} onChange={(event) => setSupplyStatus(event.target.value)}><option value="">请选择</option>{['部分提供公开检索服务', '提供对外供给服务', '提供公开检索服务', '无对外供给', '依申请开放', '已公开提供'].map((item) => <option key={item}>{item}</option>)}</select></label>
                     <label><span>供给方式 *</span><select required value={supplyMode} onChange={(event) => setSupplyMode(event.target.value)}><option value="">请选择</option><option>开源</option><option>闭源</option><option>定向</option></select></label>
                   </div>
@@ -204,7 +228,7 @@ export default function CorpusUpload() {
               <form onSubmit={submitFiles}>
                 <header className="upload-form-title"><div><span>第二步</span><h2>上传语料库</h2></div><p>示例数据与全部数据均为必传内容</p></header>
                 <section className="upload-form-section">
-                  <div className="upload-field-grid compact-grid"><label><span>语料库文件的许可协议 *</span><select required value={license} onChange={(event) => setLicense(event.target.value)}><option value="">请选择许可协议</option><option>平台科研使用许可协议</option><option>署名共享许可协议</option><option>自定义授权协议</option></select></label><label><span>开放程度 *</span><select required value={openness} onChange={(event) => setOpenness(event.target.value)}><option value="">请选择开放程度</option><option>公开</option><option>部分公开</option><option>不公开</option></select></label></div>
+                  <div className="upload-field-grid compact-grid"><label><span>语料库文件的许可协议 *</span><select required value={license} onChange={(event) => setLicense(event.target.value)}><option value="">请选择许可协议</option>{['CC0（完全开放无版权限制）', 'CC BY 4.0 保留作者署名', 'CC BY-SA 4.0 保留作者署名并要求使用者以相同许可协议分发其衍生作品', 'CC BY-NC 4.0 保留作者署名并禁止该数据用于任何商业目的', 'CC BY-NC-SA 4.0 保留作者署名，禁止该数据用于任何商业目的，并要求使用者以相同许可协议分发其衍生作品', 'CC BY-ND 4.0 保留作者署名并禁止使用者对数据进行修改、转换或创作', 'CC BY-NC-ND 4.0 保留作者署名，禁止该数据用于任何商业目的，并禁止使用者对数据进行修改、转换或创作'].map((item) => <option key={item}>{item}</option>)}</select></label><label><span>开放程度 *</span><select required value={openness} onChange={(event) => setOpenness(event.target.value)}><option value="">请选择开放程度</option><option>公开</option><option>部分公开</option><option>不公开</option></select></label></div>
                   <div className="upload-open-note"><ShieldCheck size={18} /><p>开放程度决定公众可下载的数据范围。平台管理员及被授权成员仍可按权限使用完整数据。</p></div>
                   <UploadGroup title="示例数据上传" required description="公开、部分公开和不公开语料库均需提供可展示的示例数据" state={uploads.sample} onChange={(value) => updateUpload('sample', value)} />
                   {openness === '部分公开' && <UploadGroup title="公开部分数据" required description="上传允许公众直接浏览或下载的那部分数据" state={uploads.public} onChange={(value) => updateUpload('public', value)} />}
@@ -218,7 +242,7 @@ export default function CorpusUpload() {
               <div>
                 <header className="upload-form-title"><div><span>第三步</span><h2>确认信息</h2></div><p>请核对以下内容，确认无误后提交审核</p></header>
                 <section className="upload-confirm-section"><h3>作者信息</h3>{authors.map((author, index) => <div className="confirm-author" key={index}><strong>{author.name}</strong><span>{author.contact}</span><span>{author.organization}</span></div>)}</section>
-                <section className="upload-confirm-section"><h3>语料库信息</h3><dl><div><dt>语料库名称</dt><dd>{corpusName}</dd></div><div className="is-wide"><dt>语料库介绍</dt><dd>{introduction}</dd></div><div className="is-wide"><dt>主要数据来源</dt><dd>{dataSource}</dd></div><div><dt>学科领域</dt><dd>{selectedSubjects.join('、')}</dd></div><div><dt>语料类型</dt><dd>{corpusType}</dd></div><div><dt>发布机构</dt><dd>{[effectiveOrganization, effectiveDepartment].filter(Boolean).join(' - ')}</dd></div><div><dt>所在省份</dt><dd>{province}</dd></div><div><dt>语料规模</dt><dd>{corpusSize}</dd></div><div><dt>存储容量</dt><dd>{storageSize}</dd></div><div><dt>对外供给</dt><dd>{supplyStatus}</dd></div><div><dt>供给方式</dt><dd>{supplyMode}</dd></div></dl></section>
+                <section className="upload-confirm-section"><h3>语料库信息</h3><dl><div><dt>语料库名称</dt><dd>{corpusName}</dd></div><div><dt>语料库关键词</dt><dd>{keywords.join('、')}</dd></div><div className="is-wide"><dt>语料库介绍</dt><dd>{introduction}</dd></div><div className="is-wide"><dt>主要数据来源</dt><dd>{dataSource}</dd></div><div><dt>学科领域</dt><dd>{selectedSubjects.join('、')}</dd></div><div><dt>语料类型</dt><dd>{corpusType}</dd></div><div><dt>发布机构</dt><dd>{[effectiveOrganization, effectiveDepartment].filter(Boolean).join(' - ')}</dd></div><div><dt>所在省份</dt><dd>{province}</dd></div><div><dt>语料规模</dt><dd>{corpusSize}</dd></div><div><dt>存储容量</dt><dd>{storageSize}</dd></div><div><dt>对外供给</dt><dd>{supplyStatus}</dd></div><div><dt>供给方式</dt><dd>{supplyMode}</dd></div></dl></section>
                 <section className="upload-confirm-section"><h3>文件与开放信息</h3><dl><div><dt>许可协议</dt><dd>{license}</dd></div><div><dt>开放程度</dt><dd>{openness}</dd></div><div><dt>示例数据</dt><dd>{uploads.sample.mode === 'local' ? `${uploads.sample.files.length} 个文件` : uploads.sample.github}</dd></div>{openness === '部分公开' && <div><dt>公开部分数据</dt><dd>{uploads.public.mode === 'local' ? `${uploads.public.files.length} 个文件` : uploads.public.github}</dd></div>}<div><dt>全部数据</dt><dd>{uploads.all.mode === 'local' ? `${uploads.all.files.length} 个文件` : uploads.all.github}</dd></div></dl></section>
                 <div className="upload-form-actions"><button type="button" onClick={saveDraft}><Save size={16} />保存</button><button type="button" onClick={() => setStep(2)}>上一步</button><button type="button" className="is-primary" onClick={submitReview}>提交审核</button></div>
               </div>

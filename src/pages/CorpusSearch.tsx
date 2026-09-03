@@ -184,7 +184,7 @@ export function recordDisplayMeta(item: CorpusRecord) {
     status: (index % 4 === 0 ? '待上传' : '已上传') as '已上传' | '待上传',
     corpusSize: corpusSizeBuckets[index % corpusSizeBuckets.length],
     storageSize: storageBuckets[index % storageBuckets.length],
-    opennessLabel: item.openness === '开放共享' ? '全部公开' : item.openness === '不公开' ? '不公开' : '部分公开',
+    opennessLabel: item.openness === '不公开' ? '不公开' : '公开',
   }
 }
 
@@ -472,8 +472,7 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
         return item.corpusType.includes(value)
       })) return false
       if (facetFilters.openness.length && !facetFilters.openness.some((value) => {
-        if (value === '全部公开') return item.openness === '开放共享'
-        if (value === '部分公开') return item.openness !== '开放共享' && item.openness !== '不公开'
+        if (value === '公开') return item.openness !== '不公开'
         return item.openness === '不公开'
       })) return false
 
@@ -742,7 +741,7 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
               return (
               <Link className="catalog-corpus-card" to={cardTarget} target="_blank" rel="noreferrer" key={item.id}>
                 <div className="quality-card-visual catalog-card-visual" aria-hidden="true">
-                  <span className="card-status-overlay is-partial">部分公开</span>
+                  <span className="card-status-overlay is-partial">公开</span>
                   <span className="visual-line visual-line-one" />
                   <span className="visual-line visual-line-two" />
                   <span className="visual-node node-one" />

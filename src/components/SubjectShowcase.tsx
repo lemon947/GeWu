@@ -419,7 +419,7 @@ export default function SubjectShowcase() {
               {featureSlides.map((feature, index) => (
                 <article className={index === activeFeature ? 'is-active' : ''} key={feature.title}>
                   <div className="subject-carousel-art" aria-hidden="true">
-                    <span className="card-status-overlay is-partial">部分公开</span>
+                    <span className="card-status-overlay is-partial">公开</span>
                     <span className="subject-art-line line-one" />
                     <span className="subject-art-line line-two" />
                     <span className="subject-art-node node-one" />

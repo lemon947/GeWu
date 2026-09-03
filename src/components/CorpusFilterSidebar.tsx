@@ -46,7 +46,7 @@ const storageOptions: Option[] = [
   { label: '<500GB', count: 342 }, { label: '500GB-1TB', count: 247 }, { label: '1-2TB', count: 184 }, { label: '>2TB', count: 127 },
 ]
 const opennessOptions: Option[] = [
-  { label: '全部公开', count: 516 }, { label: '部分公开', count: 327 }, { label: '不公开', count: 57 },
+  { label: '公开', count: 843 }, { label: '不公开', count: 57 },
 ]
 
 const pkuDepartments: Option[] = [

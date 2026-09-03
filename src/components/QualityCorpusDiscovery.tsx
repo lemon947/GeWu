@@ -146,7 +146,7 @@ export default function QualityCorpusDiscovery() {
           {visibleCorpus.map((item) => (
             <Link className="quality-corpus-card" to={`/search/datasets/${item.id}`} key={item.id}>
               <div className="quality-card-visual" aria-hidden="true">
-                <span className="card-status-overlay is-partial">部分公开</span>
+                <span className="card-status-overlay is-partial">公开</span>
                 <span className="visual-line visual-line-one" />
                 <span className="visual-line visual-line-two" />
                 <span className="visual-node node-one" />

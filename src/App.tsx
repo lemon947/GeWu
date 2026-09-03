@@ -6,6 +6,8 @@ import CorpusSearch from './pages/CorpusSearch'
 import ToolMarket from './pages/ToolMarket'
 import About from './pages/About'
 import DatasetDetail from './pages/DatasetDetail'
+import DatasetEdit from './pages/DatasetEdit'
+import DatasetAudit from './pages/DatasetAudit'
 import CorpusUpload from './pages/CorpusUpload'
 import Profile from './pages/Profile'
 import DemandSquare from './pages/DemandSquare'
@@ -24,6 +26,8 @@ export default function App() {
         <Route path="/search" element={<CorpusSearch pageType="search" />} />
         <Route path="/search/results" element={<ProtectedRoute><CorpusSearch pageType="results" /></ProtectedRoute>} />
         <Route path="/search/datasets/:id" element={<ProtectedRoute><DatasetDetail /></ProtectedRoute>} />
+        <Route path="/search/datasets/:id/edit" element={<ProtectedRoute><DatasetEdit /></ProtectedRoute>} />
+        <Route path="/search/datasets/:id/audit" element={<ProtectedRoute><DatasetAudit /></ProtectedRoute>} />
         <Route path="/upload" element={<CorpusUpload />} />
         <Route path="/demands" element={<DemandSquare />} />
         <Route path="/demands/new" element={<DemandCreate />} />
