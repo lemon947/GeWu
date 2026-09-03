@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, ArrowUpFromLine, FileText, FolderUp, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpFromLine, Check, Copy, FileText, FolderUp, Github, Link2, Plus, Trash2, X } from 'lucide-react'
 import { corpusRecords, recordDisplayMeta } from './CorpusSearch'
 import { provinces, pkuDepartments, subjectChildren, subjects, universities } from './CorpusUpload'
 
@@ -49,6 +49,9 @@ export default function DatasetEdit() {
   const [openness, setOpenness] = useState(item.openness === '不公开' ? '不公开' : '公开')
   const [files, setFiles] = useState<SelectedFile[]>([])
   const [remark, setRemark] = useState('')
+  const [uploadMode, setUploadMode] = useState<'local' | 'link' | 'cli'>('local')
+  const [linkKind, setLinkKind] = useState<'url' | 'github'>('url')
+  const [linkUrl, setLinkUrl] = useState('')
   const [toast, setToast] = useState('')
 
   const flashToast = (message: string) => {
@@ -173,22 +176,58 @@ export default function DatasetEdit() {
         </div>
 
         <h2 className="dataset-edit-module-title"><b>02</b>上传数据</h2>
-        <div className="edit-upload-actions">
-          <button type="button" onClick={() => fileInputRef.current?.click()}><ArrowUpFromLine size={16} />选择文件</button>
-          <button type="button" onClick={() => folderInputRef.current?.click()}><FolderUp size={16} />选择文件夹</button>
-          <span>单次上传数据大小不超过 2GB</span>
-          <input ref={fileInputRef} hidden type="file" multiple onChange={(event) => { handleFiles(event.target.files); event.currentTarget.value = '' }} />
-          <input ref={(node) => { folderInputRef.current = node; node?.setAttribute('webkitdirectory', '') }} hidden type="file" multiple onChange={(event) => { handleFiles(event.target.files); event.currentTarget.value = '' }} />
+        <div className="upload-source-tabs editor-upload-tabs">
+          <button type="button" className={uploadMode === 'local' ? 'is-active' : ''} onClick={() => setUploadMode('local')}>本地文件</button>
+          <button type="button" className={uploadMode === 'link' ? 'is-active' : ''} onClick={() => setUploadMode('link')}>链接</button>
+          <button type="button" className={uploadMode === 'cli' ? 'is-active' : ''} onClick={() => setUploadMode('cli')}>命令行</button>
         </div>
-        {files.length > 0 && (
-          <div className="upload-file-list">
-            {files.map((file) => (
-              <div className="upload-file-card" key={file.id}>
-                <FileText size={18} />
-                <div><strong>{file.name}</strong><small>{formatFileSize(file.size)}</small></div>
-                <button type="button" onClick={() => setFiles((current) => current.filter((item) => item.id !== file.id))} aria-label={`删除 ${file.name}`}><Trash2 size={16} /></button>
+        {uploadMode === 'local' && (
+          <>
+            <div className="edit-upload-actions">
+              <button type="button" onClick={() => fileInputRef.current?.click()}><ArrowUpFromLine size={16} />选择文件</button>
+              <button type="button" onClick={() => folderInputRef.current?.click()}><FolderUp size={16} />选择文件夹</button>
+              <span>单次上传数据大小不超过 2GB</span>
+              <input ref={fileInputRef} hidden type="file" multiple onChange={(event) => { handleFiles(event.target.files); event.currentTarget.value = '' }} />
+              <input ref={(node) => { folderInputRef.current = node; node?.setAttribute('webkitdirectory', '') }} hidden type="file" multiple onChange={(event) => { handleFiles(event.target.files); event.currentTarget.value = '' }} />
+            </div>
+            {files.length > 0 && (
+              <div className="upload-file-list">
+                {files.map((file) => (
+                  <div className="upload-file-card" key={file.id}>
+                    <FileText size={18} />
+                    <div><strong>{file.name}</strong><small>{formatFileSize(file.size)}</small></div>
+                    <button type="button" onClick={() => setFiles((current) => current.filter((item) => item.id !== file.id))} aria-label={`删除 ${file.name}`}><Trash2 size={16} /></button>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+          </>
+        )}
+        {uploadMode === 'link' && (
+          <div className="upload-link-panel">
+            <div className="upload-link-cards">
+              <button type="button" className={`upload-link-card${linkKind === 'url' ? ' is-active' : ''}`} onClick={() => setLinkKind('url')}>
+                <span className="upload-link-dot">{linkKind === 'url' && <Check size={14} />}</span>
+                <i className="upload-link-icon"><Link2 size={18} /></i>
+                <strong>远程 URL</strong><small>从远程 URL 创建语料资源，URL 需指向具体文件</small>
+              </button>
+              <button type="button" className={`upload-link-card${linkKind === 'github' ? ' is-active' : ''}`} onClick={() => setLinkKind('github')}>
+                <span className="upload-link-dot">{linkKind === 'github' && <Check size={14} />}</span>
+                <i className="upload-link-icon"><Github size={18} /></i>
+                <strong>GitHub 仓库</strong><small>从 GitHub 仓库归档导入，使用仓库地址或任意深层链接</small>
+              </button>
+            </div>
+            <label className="upload-link-input"><span>{linkKind === 'url' ? 'URL' : 'GitHub 仓库链接'}</span><input value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder={linkKind === 'url' ? '请输入远程 URL，如 https://…/data.zip' : '请输入 GitHub 仓库链接'} /></label>
+          </div>
+        )}
+        {uploadMode === 'cli' && (
+          <div className="upload-cli-panel">
+            <p className="cli-guide-intro">1. 安装 CLI：<code>pip install corpusware-cli</code><br />2. 在终端运行以下命令上传语料：</p>
+            <div className="download-code-block">
+              <div className="download-code-head"><button type="button" onClick={() => navigator.clipboard?.writeText('corpusware upload --corpus <语料ID> --data ./corpus')}><Copy size={15} />复制</button></div>
+              <pre><code>{'corpusware upload --corpus <语料ID> --data ./corpus'}</code></pre>
+            </div>
+            <p className="cli-guide-more">更多更丰富的命令行上传选项，可参见 具体文档。</p>
           </div>
         )}
         <label className="dataset-edit-field">

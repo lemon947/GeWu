@@ -3,15 +3,15 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  Copy,
   FileArchive,
   FileText,
-  FolderUp,
   Github,
+  Link2,
   Plus,
   Save,
   ShieldCheck,
   Trash2,
-  UploadCloud,
   UserRound,
   X,
 } from 'lucide-react'
@@ -21,7 +21,7 @@ import { corpusRecords } from './CorpusSearch'
 
 type Author = { name: string; contact: string; organization: string }
 type UploadGroupKey = 'sample' | 'public' | 'all'
-type UploadGroupState = { mode: 'local' | 'github'; files: string[]; github: string }
+type UploadGroupState = { mode: 'local' | 'link' | 'cli'; files: string[]; link: string; linkKind: 'url' | 'github' }
 
 export const subjects = ['数学', '物理', '化学', '天文', '地理', '生物']
 export const subjectChildren: Record<string, string[]> = {
@@ -34,23 +34,62 @@ export const pkuDepartments = ['数学科学学院', '物理学院', '化学与�
 export const provinces = ['北京市', '天津市', '河北省', '山西省', '内蒙古自治区', '辽宁省', '吉林省', '黑龙江省', '上海市', '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省', '河南省', '湖北省', '湖南省', '广东省', '广西壮族自治区', '海南省', '重庆市', '四川省', '贵州省', '云南省', '西藏自治区', '陕西省', '甘肃省', '青海省', '宁夏回族自治区', '新疆维吾尔自治区']
 
 const emptyAuthor = (): Author => ({ name: '', contact: '', organization: '' })
-const emptyUpload = (): UploadGroupState => ({ mode: 'local', files: [], github: '' })
+const emptyUpload = (): UploadGroupState => ({ mode: 'local', files: [], link: '', linkKind: 'url' })
+const cli_upload_cmd = 'corpusware upload --corpus <语料ID> --data ./corpus'
+
+function groupLabel(state: UploadGroupState) {
+  if (state.mode === 'local') return `${state.files.length} 个文件`
+  if (state.mode === 'link') return state.link || '—'
+  return '终端命令上传'
+}
 
 function UploadGroup({ title, required, description, state, onChange }: { title: string; required?: boolean; description: string; state: UploadGroupState; onChange: (value: UploadGroupState) => void }) {
   const inputKey = title.replace(/\s/g, '')
   const updateFiles = (files: FileList | null) => onChange({ ...state, files: files ? Array.from(files).map((file) => file.name) : [] })
   return (
     <section className="upload-file-group">
-      <div className="upload-file-group-head"><div><h3>{title}{required && <b> *</b>}</h3><p>{description}</p></div><div className="upload-source-tabs"><button type="button" className={state.mode === 'local' ? 'is-active' : ''} onClick={() => onChange({ ...state, mode: 'local' })}>本地上传</button><button type="button" className={state.mode === 'github' ? 'is-active' : ''} onClick={() => onChange({ ...state, mode: 'github' })}>外部导入</button></div></div>
-      {state.mode === 'local' ? (
-        <div className="upload-file-drop">
-          <FileArchive size={26} /><div><strong>{state.files.length ? `已选择 ${state.files.length} 个文件` : '选择需要上传的语料文件'}</strong><span>{state.files.length ? state.files.slice(0, 3).join('、') : '支持单个文件、多个文件或整个文件夹'}</span></div>
-          <div><label htmlFor={`${inputKey}-files`}><UploadCloud size={15} />上传文件</label><label htmlFor={`${inputKey}-folder`}><FolderUp size={15} />上传文件夹</label></div>
-          <input id={`${inputKey}-files`} hidden type="file" multiple onChange={(event) => updateFiles(event.target.files)} />
-          <input id={`${inputKey}-folder`} hidden type="file" multiple ref={(node) => node?.setAttribute('webkitdirectory', '')} onChange={(event) => updateFiles(event.target.files)} />
+      <div className="upload-file-group-head"><div><h3>{title}{required && <b> *</b>}</h3><p>{description}</p></div><div className="upload-source-tabs"><button type="button" className={state.mode === 'local' ? 'is-active' : ''} onClick={() => onChange({ ...state, mode: 'local' })}>本地文件</button><button type="button" className={state.mode === 'link' ? 'is-active' : ''} onClick={() => onChange({ ...state, mode: 'link' })}>链接</button><button type="button" className={state.mode === 'cli' ? 'is-active' : ''} onClick={() => onChange({ ...state, mode: 'cli' })}>命令行</button></div></div>
+      {state.mode === 'local' && (
+        <div className="upload-file-drop upload-drop-v2" onDragOver={() => false} onDrop={(event) => { event.preventDefault(); updateFiles(event.dataTransfer.files) }}>
+          <span className="upload-drop-icon"><FileArchive size={30} /></span>
+          <div className="upload-drop-copy">
+            <strong>{state.files.length ? `已选择 ${state.files.length} 个文件` : '拖拽文件到此处上传'}</strong>
+            <span>{state.files.length ? state.files.slice(0, 3).join('、') : '支持单个文件、多个文件或整个文件夹'}</span>
+            <div>
+              <label className="upload-browse-btn" htmlFor={`${inputKey}-files`}>浏览文件</label>
+              <input id={`${inputKey}-files`} hidden type="file" multiple onChange={(event) => { updateFiles(event.target.files); event.currentTarget.value = '' }} />
+              <label className="upload-browse-btn is-ghost" htmlFor={`${inputKey}-folder`}>选择文件夹</label>
+              <input id={`${inputKey}-folder`} hidden type="file" multiple ref={(node) => node?.setAttribute('webkitdirectory', '')} onChange={(event) => { updateFiles(event.target.files); event.currentTarget.value = '' }} />
+            </div>
+          </div>
         </div>
-      ) : (
-        <label className="upload-github-field"><Github size={20} /><input value={state.github} onChange={(event) => onChange({ ...state, github: event.target.value })} placeholder="请输入 GitHub 仓库链接" /></label>
+      )}
+      {state.mode === 'link' && (
+        <div className="upload-link-panel">
+          <div className="upload-link-cards">
+            <button type="button" className={`upload-link-card${state.linkKind === 'url' ? ' is-active' : ''}`} onClick={() => onChange({ ...state, linkKind: 'url' })}>
+              <span className="upload-link-dot">{state.linkKind === 'url' && <Check size={14} />}</span>
+              <i className="upload-link-icon"><Link2 size={18} /></i>
+              <strong>远程 URL</strong><small>从远程 URL 创建语料资源，URL 需指向具体文件</small>
+            </button>
+            <button type="button" className={`upload-link-card${state.linkKind === 'github' ? ' is-active' : ''}`} onClick={() => onChange({ ...state, linkKind: 'github' })}>
+              <span className="upload-link-dot">{state.linkKind === 'github' && <Check size={14} />}</span>
+              <i className="upload-link-icon"><Github size={18} /></i>
+              <strong>GitHub 仓库</strong><small>从 GitHub 仓库归档导入，使用仓库地址或任意深层链接</small>
+            </button>
+          </div>
+          <label className="upload-link-input"><span>{state.linkKind === 'url' ? 'URL' : 'GitHub 仓库链接'}</span><input value={state.link} onChange={(event) => onChange({ ...state, link: event.target.value })} placeholder={state.linkKind === 'url' ? '请输入远程 URL，如 https://…/data.zip' : '请输入 GitHub 仓库链接'} /></label>
+        </div>
+      )}
+      {state.mode === 'cli' && (
+        <div className="upload-cli-panel">
+          <p className="cli-guide-intro">1. 安装 CLI：<code>pip install corpusware-cli</code><br />2. 在终端运行以下命令上传语料：</p>
+          <div className="download-code-block">
+            <div className="download-code-head"><button type="button" onClick={() => navigator.clipboard?.writeText(cli_upload_cmd)}><Copy size={15} />复制</button></div>
+            <pre><code>{cli_upload_cmd}</code></pre>
+          </div>
+          <p className="cli-guide-more">更多更丰富的命令行上传选项，可参见 <a>具体文档</a>。</p>
+        </div>
       )}
     </section>
   )
@@ -146,7 +185,12 @@ export default function CorpusUpload() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const uploadReady = (key: UploadGroupKey) => uploads[key].mode === 'local' ? uploads[key].files.length > 0 : Boolean(uploads[key].github.trim())
+  const uploadReady = (key: UploadGroupKey) => {
+    const group = uploads[key]
+    if (group.mode === 'local') return group.files.length > 0
+    if (group.mode === 'link') return Boolean(group.link.trim())
+    return true
+  }
   const submitFiles = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!license || !openness) return notify('请选择许可协议和开放程度')
@@ -243,7 +287,7 @@ export default function CorpusUpload() {
                 <header className="upload-form-title"><div><span>第三步</span><h2>确认信息</h2></div><p>请核对以下内容，确认无误后提交审核</p></header>
                 <section className="upload-confirm-section"><h3>作者信息</h3>{authors.map((author, index) => <div className="confirm-author" key={index}><strong>{author.name}</strong><span>{author.contact}</span><span>{author.organization}</span></div>)}</section>
                 <section className="upload-confirm-section"><h3>语料库信息</h3><dl><div><dt>语料库名称</dt><dd>{corpusName}</dd></div><div><dt>语料库关键词</dt><dd>{keywords.join('、')}</dd></div><div className="is-wide"><dt>语料库介绍</dt><dd>{introduction}</dd></div><div className="is-wide"><dt>主要数据来源</dt><dd>{dataSource}</dd></div><div><dt>学科领域</dt><dd>{selectedSubjects.join('、')}</dd></div><div><dt>语料类型</dt><dd>{corpusType}</dd></div><div><dt>发布机构</dt><dd>{[effectiveOrganization, effectiveDepartment].filter(Boolean).join(' - ')}</dd></div><div><dt>所在省份</dt><dd>{province}</dd></div><div><dt>语料规模</dt><dd>{corpusSize}</dd></div><div><dt>存储容量</dt><dd>{storageSize}</dd></div><div><dt>对外供给</dt><dd>{supplyStatus}</dd></div><div><dt>供给方式</dt><dd>{supplyMode}</dd></div></dl></section>
-                <section className="upload-confirm-section"><h3>文件与开放信息</h3><dl><div><dt>许可协议</dt><dd>{license}</dd></div><div><dt>开放程度</dt><dd>{openness}</dd></div><div><dt>示例数据</dt><dd>{uploads.sample.mode === 'local' ? `${uploads.sample.files.length} 个文件` : uploads.sample.github}</dd></div>{openness === '部分公开' && <div><dt>公开部分数据</dt><dd>{uploads.public.mode === 'local' ? `${uploads.public.files.length} 个文件` : uploads.public.github}</dd></div>}<div><dt>全部数据</dt><dd>{uploads.all.mode === 'local' ? `${uploads.all.files.length} 个文件` : uploads.all.github}</dd></div></dl></section>
+                <section className="upload-confirm-section"><h3>文件与开放信息</h3><dl><div><dt>许可协议</dt><dd>{license}</dd></div><div><dt>开放程度</dt><dd>{openness}</dd></div><div><dt>示例数据</dt><dd>{groupLabel(uploads.sample)}</dd></div>{openness === '部分公开' && <div><dt>公开部分数据</dt><dd>{groupLabel(uploads.public)}</dd></div>}<div><dt>全部数据</dt><dd>{groupLabel(uploads.all)}</dd></div></dl></section>
                 <div className="upload-form-actions"><button type="button" onClick={saveDraft}><Save size={16} />保存</button><button type="button" onClick={() => setStep(2)}>上一步</button><button type="button" className="is-primary" onClick={submitReview}>提交审核</button></div>
               </div>
             )}

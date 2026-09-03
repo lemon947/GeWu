@@ -24,7 +24,7 @@ type OperationLog = {
 
 const pendingTasks: AuditTask[] = [
   { id: 'REQ-20260830-01', type: '加入申请', content: '上传权限', applicant: '李思远', appliedAt: '2026-08-30 14:22' },
-  { id: 'REQ-20260831-01', type: '数据上传', content: '数据URL', applicant: '建设编辑', appliedAt: '2026-08-31 09:10' },
+  { id: 'REQ-20260831-01', type: '数据上传', content: '数据URL', applicant: '建设编辑', appliedAt: '2026-08-31 09:10', remark: '数据集大小 1.2GB，共 12 个样例文件' },
 ]
 
 const operationLogs: OperationLog[] = [
@@ -200,15 +200,15 @@ export default function DatasetAudit() {
               <table className="audit-table">
                 <thead>
                   <tr>
-                    <th>ID</th><th>类型</th><th>申请内容</th><th>申请人</th><th>申请时间</th>
-                    {subTab === '已办结' && <><th>状态</th><th>审批人</th><th>审批时间</th><th>备注</th></>}
-                    <th>操作</th>
+                    <th>ID</th><th>类型</th><th>申请内容</th>{subTab === '待审批' ? <><th>备注</th></> : <></>}<th>申请人</th><th>申请时间</th>
+                    {subTab === '已办结' && <><th>状态</th><th>审批人</th><th>审批时间</th><th>审批备注</th></>}
+                    {subTab === '待审批' && <th>操作</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {subTab === '待审批' ? visiblePending.map((task) => (
                     <tr key={task.id}>
-                      <td>{task.id}</td><td>{task.type}</td><td>{task.content}</td><td>{task.applicant}</td><td>{task.appliedAt}</td>
+                      <td>{task.id}</td><td>{task.type}</td><td>{task.content}</td><td>{task.remark || '—'}</td><td>{task.applicant}</td><td>{task.appliedAt}</td>
                       <td><span className="audit-row-actions"><button type="button" onClick={() => decide(task, '已通过')}>通过</button><button type="button" className="is-reject" onClick={() => { setRejectTarget(task); setRejectReason('') }}>拒绝</button></span></td>
                     </tr>
                   )) : visibleFinished.map((task) => (
@@ -216,11 +216,10 @@ export default function DatasetAudit() {
                       <td>{task.id}</td><td>{task.type}</td><td>{task.content}</td><td>{task.applicant}</td><td>{task.appliedAt}</td>
                       <td><span className={`audit-status is-${task.status === '已通过' ? 'pass' : 'reject'}`}>{task.status}</span></td>
                       <td>{task.approver}</td><td>{task.approvedAt}</td><td>{task.remark || '—'}</td>
-                      <td><button className="audit-view-link" type="button" onClick={() => flashToast(`查看审批详情：${task.id}`)}>查看详情</button></td>
                     </tr>
                   ))}
                   {(subTab === '待审批' ? visiblePending : visibleFinished).length === 0 && (
-                    <tr><td colSpan={subTab === '已办结' ? 10 : 6}><div className="audit-empty"><FileClock size={46} /><p>暂无数据</p></div></td></tr>
+                    <tr><td colSpan={subTab === '已办结' ? 9 : 7}><div className="audit-empty"><FileClock size={46} /><p>暂无数据</p></div></td></tr>
                   )}
                 </tbody>
               </table>

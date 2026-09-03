@@ -787,7 +787,14 @@ corpusware download --corpus ${item.id} --output ./corpus`}</code></pre>
                       <article className="usage-guide-step" id={`usage-guide-${index + 1}`} key={section.title}>
                         <h3>{section.title}</h3>
                         <p>{section.content}</p>
-                        {section.code && <pre><code>{section.code}</code></pre>}
+                        {section.code && (
+                          <div className="download-code-block">
+                            <div className="download-code-head">
+                              <button type="button" onClick={() => copyText(section.code as string, '命令已复制')}><Copy size={15} />复制</button>
+                            </div>
+                            <pre><code>{section.code}</code></pre>
+                          </div>
+                        )}
                       </article>
                     ))}
                     <h3>完整的下载示例代码</h3>
