@@ -1,10 +1,11 @@
-import { type FormEvent, useMemo, useRef, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ArrowUpFromLine,
   Building2,
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Copy,
@@ -17,6 +18,7 @@ import {
   FolderUp,
   Github,
   Info,
+  Link2,
   MessageCircle,
   Maximize2,
   Minimize2,
@@ -39,7 +41,7 @@ import { useApp } from '../context/app-context'
 import { corpusRecords, recordDisplayMeta } from './CorpusSearch'
 
 type DetailTab = 'intro' | 'download' | 'comments'
-type UploadMode = 'local' | 'external'
+type UploadMode = 'local' | 'link' | 'cli'
 type MemberPermission = '可管理' | '可上传'
 type CommentSort = 'time' | 'likes'
 type DetailRole = 'admin' | 'uploader' | 'guest'
@@ -204,6 +206,7 @@ function buildZip(files: Array<{ name: string; content: string }>): Blob {
 }
 
 const commentsSeed = [
+  { id: 4, user: '王磊', date: '2026-08-20', likes: 9, liked: false, text: '这套语料在长上下文推理任务上表现稳定，但跨学科场景下的泛化效果还比较有限。我们在小范围评测后发现，部分指令的格式约定不够统一，建议在下一版本中补充字段口径说明与质量校验标注；同时希望能进一步细化推理链的难度分级，并在许可范围允许的前提下，开放更多难度分层的样例样本，方便不同水平的模型评测团队按需取用、评估不同量级的推理能力。整体而言质量值得肯定，字段覆盖与 README 说明基本一致，对于领域内多步推理与知识检索结合的评测场景具有较高的参考价值，后续会持续关注更新进度并反馈使用问题。' },
   { id: 1, user: '林知远', date: '2026-08-18', likes: 24, liked: false, text: '样例数据结构很清楚，适合快速接入模型评测流程，希望后续补充更多字段说明。' },
   { id: 2, user: '医学语料联合实验室', date: '2026-08-12', likes: 18, liked: false, text: '对科研问答和推理链训练很有帮助，下载目录划分也比较明确。' },
   { id: 3, user: '陈明', date: '2026-08-02', likes: 31, liked: false, text: '建议增加数据质量报告和版本间差异说明，方便长期引用。' },
@@ -233,6 +236,16 @@ const uploadLicenseOptions = [
 ]
 
 const maxUploadBytes = 2 * 1024 * 1024 * 1024
+
+const memberSearchPool = [
+  { account: 'research_li', name: '李思远' },
+  { account: 'research_chen', name: '陈明' },
+  { account: 'corpus_editor02', name: '建设编辑' },
+  { account: 'lab_zhang', name: '张伟' },
+  { account: 'lab_wang', name: '王磊' },
+  { account: 'math_lin', name: '林知远' },
+  { account: 'medical_lab', name: '医学语料联合实验室' },
+]
 const maxUploadSizeLabel = '2GB'
 
 function detailOpennessLabel(openness: string) {
@@ -251,6 +264,48 @@ function formatForSubject(subject: string) {
   if (subject === '化学') return '反应SMARTS + 结构化文本'
   if (subject === '地理' || subject === '天文') return 'CSV、JSON、XML、API接口'
   return 'CSV / JSON / SQL'
+}
+
+function CommentBody({ text, expanded, onToggle }: { text: string; expanded: boolean; onToggle: () => void }) {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [clipAt, setClipAt] = useState<number | null>(null)
+
+  useEffect(() => {
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const updateClip = () => {
+      const charsPerLine = Math.max(18, Math.floor(wrap.clientWidth / 15.2))
+      const limit = charsPerLine * 3 - 14
+      setClipAt(text.length > limit && limit > 20 ? limit : null)
+    }
+    updateClip()
+    const observer = new ResizeObserver(updateClip)
+    observer.observe(wrap)
+    return () => observer.disconnect()
+  }, [text])
+
+  const collapsed = clipAt !== null && !expanded
+  return (
+    <div ref={wrapRef} className="comment-text-wrap">
+      <p className={`comment-text${expanded ? ' is-expanded' : ''}`}>
+        {collapsed ? `${text.slice(0, clipAt).trimEnd()}....` : text}
+        {collapsed && (
+          <button className="comment-more-inline" type="button" onClick={(event) => { event.stopPropagation(); onToggle() }}>展开更多</button>
+        )}
+      </p>
+      {clipAt !== null && expanded && (
+        <button className="comment-more" type="button" onClick={(event) => { event.stopPropagation(); onToggle() }}>收起</button>
+      )}
+    </div>
+  )
+}
+
+/** 语料类型统一为 4 种取值：预训练 / 后训练 / RAG / 微调 */
+function detailCorpusTypeLabel(corpusType: string) {
+  if (corpusType.includes('后训练')) return '后训练'
+  if (corpusType.includes('RAG') || corpusType.includes('检索')) return 'RAG'
+  if (corpusType.includes('微调')) return '微调'
+  return '预训练'
 }
 
 function formatFileSize(size: number) {
@@ -279,7 +334,9 @@ export default function DatasetDetail() {
   const [memberOpen, setMemberOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [joinRequestOpen, setJoinRequestOpen] = useState(false)
+  const [joinSubmitted, setJoinSubmitted] = useState(false)
   const [uploadMode, setUploadMode] = useState<UploadMode>('local')
+  const [linkKind, setLinkKind] = useState<'url' | 'github'>('url')
   const [authorFollowed, setAuthorFollowed] = useState(false)
   const [uploadLicense, setUploadLicense] = useState('')
   const [uploadRemark, setUploadRemark] = useState('')
@@ -287,6 +344,8 @@ export default function DatasetDetail() {
   const [uploadSizeError, setUploadSizeError] = useState('')
   const [externalSource, setExternalSource] = useState('')
   const [memberQuery, setMemberQuery] = useState('')
+  const [memberSelected, setMemberSelected] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [memberPermission, setMemberPermission] = useState<MemberPermission>('可上传')
   const [metadataFormat, setMetadataFormat] = useState<'JSON' | 'CSV'>('JSON')
   const [commentSort, setCommentSort] = useState<CommentSort>('time')
@@ -306,6 +365,7 @@ export default function DatasetDetail() {
     { account: 'research_user02', name: '科研使用者', permission: '可上传' },
   ])
   const [comments, setComments] = useState(commentsSeed)
+  const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set())
   const toastTimer = useRef<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
@@ -363,7 +423,7 @@ export default function DatasetDetail() {
 
   const downloadSampleFile = (file = selectedFile) => {
     if (openness === '不公开') {
-      notify('该语料库暂时未公开，若需要可联系作者')
+      notify('该语料库暂为非公开，如需要请联系作者')
       return
     }
     const scope = openness === '公开' ? '全部数据' : '作者公开的数据'
@@ -373,7 +433,7 @@ export default function DatasetDetail() {
 
   const downloadAllSamples = () => {
     if (openness === '不公开') {
-      notify('该语料库暂时未公开，若需要可联系作者')
+      notify('该语料库暂为非公开，如需要请联系作者')
       return
     }
     const scope = openness === '公开' ? '全部数据' : '作者公开的数据'
@@ -404,7 +464,7 @@ export default function DatasetDetail() {
 
   const downloadZip = () => {
     if (openness === '不公开') {
-      notify('该语料库暂时未公开，若需要可联系作者')
+      notify('该语料库暂为非公开，如需要请联系作者')
       return
     }
     const blob = buildZip([
@@ -454,11 +514,19 @@ export default function DatasetDetail() {
   const addMember = () => {
     const value = memberQuery.trim()
     if (!value) return
-    const name = value.includes('@') ? value.split('@')[0] : value
+    const matched = memberSearchPool.find((option) => option.account === value || option.name === value)
+    const name = matched?.name ?? (value.includes('@') ? value.split('@')[0] : value)
     setMembers((current) => [...current.filter((member) => member.account !== value), { account: value, name, permission: memberPermission }])
     setMemberQuery('')
+    setMemberSelected(false)
     notify('成员已添加')
   }
+
+  const searchResults = useMemo(() => {
+    const normalized = memberQuery.trim()
+    if (!normalized) return []
+    return memberSearchPool.filter((option) => (option.account + option.name).includes(normalized)).slice(0, 6)
+  }, [memberQuery])
 
   const removeMember = (account: string) => {
     if (!window.confirm('确认移除该成员吗？')) return
@@ -490,7 +558,7 @@ export default function DatasetDetail() {
       notify('请选择许可协议')
       return
     }
-    const hasData = uploadMode === 'local' ? uploadFiles.length > 0 : Boolean(externalSource.trim())
+    const hasData = uploadMode === 'local' ? uploadFiles.length > 0 : uploadMode === 'link' ? Boolean(externalSource.trim()) : true
     if (!hasData) {
       notify('请选择要上传的数据')
       return
@@ -504,6 +572,7 @@ export default function DatasetDetail() {
     setUploadFiles([])
     setUploadSizeError('')
     setExternalSource('')
+    setLinkKind('url')
     setUploadRemark('')
     notify('语料已提交，等待管理员审核')
   }
@@ -519,6 +588,15 @@ export default function DatasetDetail() {
     setCommentDraft('')
     setCommentComposerOpen(false)
     notify('评论已发布')
+  }
+
+  const toggleCommentExpanded = (id: number) => {
+    setExpandedComments((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   const openReplyPanel = (commentId: number, targetUser: string, targetText: string) => {
@@ -545,10 +623,9 @@ export default function DatasetDetail() {
 
   const submitJoinRequest = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setJoinRequestOpen(false)
+    setJoinSubmitted(true)
     setJoinRemark('')
     setJoinPermission('可上传')
-    notify('申请发送至管理员消息中心 等待审核')
   }
 
   const goEditUpload = () => {
@@ -574,9 +651,9 @@ export default function DatasetDetail() {
               <h1>{item.title}</h1>
               <div className="dataset-badges">
                 <span className="is-subject">{item.subject}</span>
-                <span>{item.corpusType}</span>
+                <span>{detailCorpusTypeLabel(item.corpusType)}</span>
                 <span className="is-open">{openness}</span>
-                <span className={`dataset-status ${displayMeta.status === '已上传' ? 'is-uploaded' : 'is-pending'}`}>{displayMeta.status}</span>
+                <span className={`dataset-status ${displayMeta.status === '已上线' ? 'is-uploaded' : 'is-pending'}`}>{displayMeta.status}</span>
               </div>
               <div className="dataset-author-line">
                 作者：张伟；李娜；王磊
@@ -738,7 +815,7 @@ export default function DatasetDetail() {
         {activeTab === 'download' && (
           <div className="dataset-tab-body">
             {openness === '不公开' ? (
-              <div className="private-dataset-note">该语料库暂时未公开，若需要可联系作者。</div>
+              <div className="private-dataset-note">该语料库暂为非公开，如需要请联系作者</div>
             ) : (
               <section className="usage-guide-layout download-via-layout">
                 <nav className="usage-guide-toc" aria-label="下载方式目录">
@@ -853,7 +930,11 @@ corpusware download --corpus ${item.id} --output ./corpus`}</code></pre>
                   <div className="comment-avatar">{comment.user.slice(0, 1)}</div>
                   <div>
                     <header><strong>{comment.user}</strong><span>{comment.date}</span></header>
-                    <p>{comment.text}</p>
+                    <CommentBody
+                      text={comment.text}
+                      expanded={expandedComments.has(comment.id)}
+                      onToggle={() => toggleCommentExpanded(comment.id)}
+                    />
                     <div className="comment-card-actions">
                       <button
                         className={comment.liked ? 'is-active' : ''}
@@ -942,15 +1023,23 @@ corpusware download --corpus ${item.id} --output ./corpus`}</code></pre>
             <div className="dataset-modal-title"><div><Users size={21} /><h2>管理成员</h2></div><button type="button" onClick={() => setMemberOpen(false)} aria-label="关闭"><X size={18} /></button></div>
             <div className="member-add-title">添加成员</div>
             <div className="member-add-row">
-              <label className="member-search-field"><Search size={18} /><input value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} placeholder="输入用户账号名" /></label>
+              <label className="member-search-field member-search-wrap"><Search size={18} /><input value={memberQuery} onChange={(event) => { setMemberQuery(event.target.value); setMemberSelected(false) }} placeholder="请输入用户账号进行搜索" onFocus={() => setSearchOpen(true)} onBlur={() => window.setTimeout(() => setSearchOpen(false), 150)} />{searchOpen && searchResults.length > 0 && (
+                <div className="member-search-popover">
+                  {searchResults.map((option) => (
+                    <button type="button" className="member-search-item" key={option.account} onMouseDown={(event) => event.preventDefault()} onClick={() => { setMemberQuery(option.name); setMemberSelected(true); setSearchOpen(false) }}>
+                      <span>{option.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}</label>
               <select value={memberPermission} onChange={(event) => setMemberPermission(event.target.value as MemberPermission)}><option>可管理</option><option>可上传</option></select>
-              <button type="button" onClick={addMember}><UserPlus size={16} />添加成员</button>
+              <button type="button" disabled={!memberSelected} onClick={addMember}><UserPlus size={16} />添加成员</button>
             </div>
             <div className="member-list member-list-v2">
               {members.map((member) => (
                 <div key={member.account}>
                   <span className="member-avatar">{member.name.slice(0, 1)}</span>
-                  <div><strong>{member.name}</strong><small>{member.account}</small></div>
+                  <div><strong>{member.name}</strong></div>
                   <select value={member.permission} onChange={(event) => setMembers((current) => current.map((item) => item.account === member.account ? { ...item, permission: event.target.value as MemberPermission } : item))}><option>可管理</option><option>可上传</option></select>
                   <button type="button" onClick={() => removeMember(member.account)}><Trash2 size={15} />移除</button>
                 </div>
@@ -964,24 +1053,35 @@ corpusware download --corpus ${item.id} --output ./corpus`}</code></pre>
       )}
 
       {joinRequestOpen && (
-        <div className="dataset-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setJoinRequestOpen(false) }}>
-          <form className="dataset-modal join-request-modal" onSubmit={submitJoinRequest}>
-            <button className="join-request-close" type="button" onClick={() => setJoinRequestOpen(false)} aria-label="关闭"><X size={20} /></button>
-            <div className="join-request-illustration"><ShieldCheck size={54} /></div>
-            <h2>申请加入语料库</h2>
-            <p>当前账号未加入语料库，你可以向管理员申请权限</p>
-            <div className="join-request-form">
-              <label>
-                <span>申请权限</span>
-                <select value={joinPermission} onChange={(event) => setJoinPermission(event.target.value as MemberPermission)}>
-                  <option>可管理</option>
-                  <option>可上传</option>
-                </select>
-              </label>
-              <textarea maxLength={1000} value={joinRemark} onChange={(event) => setJoinRemark(event.target.value)} placeholder="添加备注（选填）" />
-              <button type="submit">提交申请</button>
-            </div>
-          </form>
+        <div className="dataset-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) { setJoinRequestOpen(false); setJoinSubmitted(false) } }}>
+          <section className="dataset-modal join-request-modal" role="dialog" aria-modal="true" aria-labelledby="join-request-title">
+            <button className="join-request-close" type="button" onClick={() => { setJoinRequestOpen(false); setJoinSubmitted(false) }} aria-label="关闭"><X size={20} /></button>
+            {joinSubmitted ? (
+              <div className="join-request-success">
+                <CheckCircle2 size={52} />
+                <h2 id="join-request-title">申请已发送至管理员</h2>
+                <p>请等待审核，审核结果将在【个人主页-消息通知】通知您</p>
+                <button type="button" onClick={() => { setJoinRequestOpen(false); setJoinSubmitted(false) }}>完成</button>
+              </div>
+            ) : (
+              <>
+                <div className="join-request-illustration"><ShieldCheck size={54} /></div>
+                <h2 id="join-request-title">申请加入语料库</h2>
+                <p>当前账号未加入语料库，你可以向管理员申请权限</p>
+                <form className="join-request-form" onSubmit={submitJoinRequest}>
+                  <label>
+                    <span>申请权限</span>
+                    <select value={joinPermission} onChange={(event) => setJoinPermission(event.target.value as MemberPermission)}>
+                      <option>可管理</option>
+                      <option>可上传</option>
+                    </select>
+                  </label>
+                  <textarea maxLength={1000} value={joinRemark} onChange={(event) => setJoinRemark(event.target.value)} placeholder="添加备注（选填）" />
+                  <button type="submit">提交申请</button>
+                </form>
+              </>
+            )}
+          </section>
         </div>
       )}
 
@@ -993,7 +1093,7 @@ corpusware download --corpus ${item.id} --output ./corpus`}</code></pre>
             <label className="upload-license is-required"><span>备注</span><textarea required value={uploadRemark} onChange={(event) => setUploadRemark(event.target.value)} placeholder="请填写本次上传内容说明、数据来源或变更备注" /></label>
             <section className="upload-data-section is-required">
               <span>上传数据</span>
-              <div className="upload-mode-tabs"><button type="button" className={uploadMode === 'local' ? 'is-active' : ''} onClick={() => { setUploadMode('local'); setExternalSource('') }}>本地上传</button><button type="button" className={uploadMode === 'external' ? 'is-active' : ''} onClick={() => { setUploadMode('external'); setUploadFiles([]) }}>外部导入</button></div>
+              <div className="upload-mode-tabs"><button type="button" className={uploadMode === 'local' ? 'is-active' : ''} onClick={() => setUploadMode('local')}>本地上传</button><button type="button" className={uploadMode === 'link' ? 'is-active' : ''} onClick={() => setUploadMode('link')}>外部链接导入</button><button type="button" className={uploadMode === 'cli' ? 'is-active' : ''} onClick={() => setUploadMode('cli')}>命令行上传</button></div>
               {uploadMode === 'local' ? (
                 <>
                   {uploadSizeError && <p className="upload-size-error">{uploadSizeError}</p>}
@@ -1010,12 +1110,30 @@ corpusware download --corpus ${item.id} --output ./corpus`}</code></pre>
                     </div>
                   )}
                 </>
+              ) : uploadMode === 'link' ? (
+                <div className="upload-link-panel upload-modal-link-panel">
+                  <div className="upload-link-cards">
+                    <button type="button" className={`upload-link-card${linkKind === 'url' ? ' is-active' : ''}`} onClick={() => setLinkKind('url')}>
+                      <span className="upload-link-dot">{linkKind === 'url' && <Check size={14} />}</span>
+                      <i className="upload-link-icon"><Link2 size={18} /></i>
+                      <strong>远程 URL</strong><small>从远程 URL 创建语料资源，URL 需指向具体文件</small>
+                    </button>
+                    <button type="button" className={`upload-link-card${linkKind === 'github' ? ' is-active' : ''}`} onClick={() => setLinkKind('github')}>
+                      <span className="upload-link-dot">{linkKind === 'github' && <Check size={14} />}</span>
+                      <i className="upload-link-icon"><Github size={18} /></i>
+                      <strong>GitHub 仓库</strong><small>从 GitHub 仓库归档导入，使用仓库地址或任意深层链接</small>
+                    </button>
+                  </div>
+                  <label className="upload-link-input"><span>{linkKind === 'url' ? 'URL' : 'GitHub 仓库链接'}</span><input value={externalSource} onChange={(event) => setExternalSource(event.target.value)} placeholder={linkKind === 'url' ? '请输入远程 URL，如 https://…/data.zip' : 'https://github.com/organization/repository'} /></label>
+                </div>
               ) : (
-                <label className="github-import">
-                  <Github size={28} />
-                  <span>GitHub 仓库链接</span>
-                  <input value={externalSource} onChange={(event) => setExternalSource(event.target.value)} placeholder="https://github.com/organization/repository" />
-                </label>
+                <div className="upload-cli-panel">
+                  <p className="cli-guide-intro">1. 安装 CLI：<code>pip install corpusware-cli</code><br />2. 在终端运行以下命令上传语料：</p>
+                  <div className="download-code-block">
+                    <div className="download-code-head"><button type="button" onClick={() => navigator.clipboard?.writeText(`corpusware upload --corpus ${item.id} --data ./corpus`)}><Copy size={15} />复制</button></div>
+                    <pre><code>{`corpusware upload --corpus ${item.id} --data ./corpus`}</code></pre>
+                  </div>
+                </div>
               )}
             </section>
             <label className="upload-confirm is-required"><input required type="checkbox" /><span>我已确认上传内容符合许可协议及平台合规要求</span></label>

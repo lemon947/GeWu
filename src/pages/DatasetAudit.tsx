@@ -8,6 +8,7 @@ type AuditTask = {
   type: string
   content: string
   applicant: string
+  reason?: string
   appliedAt: string
   status?: '已通过' | '已拒绝'
   approver?: string
@@ -23,8 +24,8 @@ type OperationLog = {
 }
 
 const pendingTasks: AuditTask[] = [
-  { id: 'REQ-20260830-01', type: '加入申请', content: '上传权限', applicant: '李思远', appliedAt: '2026-08-30 14:22' },
-  { id: 'REQ-20260831-01', type: '数据上传', content: '数据URL', applicant: '建设编辑', appliedAt: '2026-08-31 09:10', remark: '数据集大小 1.2GB，共 12 个样例文件' },
+  { id: 'REQ-20260830-01', type: '加入申请', content: '上传权限', applicant: '李思远', reason: '希望获得语料库上传权限，便于后续研究使用', appliedAt: '2026-08-30 14:22' },
+  { id: 'REQ-20260831-01', type: '数据上传', content: '数据URL', applicant: '建设编辑', reason: '计划补充一批高质量样例数据，附件含数据说明', appliedAt: '2026-08-31 09:10', remark: '数据集大小 1.2GB，共 12 个样例文件' },
 ]
 
 const operationLogs: OperationLog[] = [
@@ -200,7 +201,7 @@ export default function DatasetAudit() {
               <table className="audit-table">
                 <thead>
                   <tr>
-                    <th>ID</th><th>类型</th><th>申请内容</th>{subTab === '待审批' ? <><th>备注</th></> : <></>}<th>申请人</th><th>申请时间</th>
+                    <th>ID</th><th>类型</th><th>申请内容</th>{subTab === '待审批' ? <><th>备注</th></> : <></>}<th>申请人</th>{subTab === '已办结' && <th>申请理由</th>}<th>申请时间</th>
                     {subTab === '已办结' && <><th>状态</th><th>审批人</th><th>审批时间</th><th>审批备注</th></>}
                     {subTab === '待审批' && <th>操作</th>}
                   </tr>
@@ -213,13 +214,13 @@ export default function DatasetAudit() {
                     </tr>
                   )) : visibleFinished.map((task) => (
                     <tr key={task.id}>
-                      <td>{task.id}</td><td>{task.type}</td><td>{task.content}</td><td>{task.applicant}</td><td>{task.appliedAt}</td>
+                      <td>{task.id}</td><td>{task.type}</td><td>{task.content}</td><td>{task.applicant}</td><td>{task.reason || '—'}</td><td>{task.appliedAt}</td>
                       <td><span className={`audit-status is-${task.status === '已通过' ? 'pass' : 'reject'}`}>{task.status}</span></td>
                       <td>{task.approver}</td><td>{task.approvedAt}</td><td>{task.remark || '—'}</td>
                     </tr>
                   ))}
                   {(subTab === '待审批' ? visiblePending : visibleFinished).length === 0 && (
-                    <tr><td colSpan={subTab === '已办结' ? 9 : 7}><div className="audit-empty"><FileClock size={46} /><p>暂无数据</p></div></td></tr>
+                    <tr><td colSpan={subTab === '已办结' ? 10 : 7}><div className="audit-empty"><FileClock size={46} /><p>暂无数据</p></div></td></tr>
                   )}
                 </tbody>
               </table>

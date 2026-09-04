@@ -125,7 +125,7 @@ export const corpusRecords: CorpusRecord[] = [
   { id: 'chem-04', title: '环境化学专业问答与推理语料', organization: '武汉大学', subject: '化学', corpusType: '后训练语料', openness: '开放共享', summary: '围绕污染物行为、环境过程与风险判断构建专业问题、依据和规范化解答。', publishedAt: '2026-05-18', views: 1745, favorites: 213, usage: 473, authors: '武汉大学资源与环境科学学院', keywords: ['环境化学', '专业问答', '风险判断'] },
   { id: 'astro-04', title: '射电天文观测数据与说明语料', organization: '清华大学', subject: '天文', corpusType: '预训练语料', openness: '定向开放', summary: '整合射电观测数据、设备参数、质量标记和研究说明，支持天文观测数据理解。', publishedAt: '2026-05-12', views: 1298, favorites: 149, usage: 268, authors: '清华大学天文系', keywords: ['射电天文', '观测数据', '设备参数'] },
   { id: 'geo-04', title: '城市空间结构与功能区识别语料', organization: '北京大学', subject: '地理', corpusType: '多模态语料', openness: '开放共享', summary: '融合地图、遥感影像、兴趣点和城市规划文本，支持城市功能区识别与空间分析。', publishedAt: '2026-05-06', views: 2418, favorites: 305, usage: 691, authors: '北京大学城市与环境学院', keywords: ['城市空间', '功能区', '空间分析'] },
-  { id: 'bio-04', title: '生物机理分析与实验验证语料', organization: '个人贡献者', subject: '生物', corpusType: '长思维链语料', openness: '依申请开放', summary: '围绕典型生物学问题组织机制假设、证据分析、实验设计和结果验证过程。', publishedAt: '2026-04-28', views: 1168, favorites: 136, usage: 224, authors: '平台认证科研贡献者', keywords: ['生物机理', '实验设计', '结果验证'] },
+  { id: 'bio-04', title: '生物机理分析与实验验证语料', organization: '个人贡献者', subject: '生物', corpusType: '长思维链语料', openness: '不公开', summary: '围绕典型生物学问题组织机制假设、证据分析、实验设计和结果验证过程。', publishedAt: '2026-07-12', views: 1168, favorites: 136, usage: 224, authors: '平台认证科研贡献者', keywords: ['生物机理', '实验设计', '结果验证'] },
 ]
 
 const initialConditions = (): SearchCondition[] => [
@@ -181,7 +181,7 @@ const storageBuckets = ['<500GB', '500GB-1TB', '1-2TB', '>2TB']
 export function recordDisplayMeta(item: CorpusRecord) {
   const index = Math.max(0, corpusRecords.findIndex((record) => record.id === item.id))
   return {
-    status: (index % 4 === 0 ? '待上传' : '已上传') as '已上传' | '待上传',
+    status: (index % 4 === 0 ? '建设中' : '已上线') as '已上线' | '建设中',
     corpusSize: corpusSizeBuckets[index % corpusSizeBuckets.length],
     storageSize: storageBuckets[index % storageBuckets.length],
     opennessLabel: item.openness === '不公开' ? '不公开' : '公开',
@@ -502,7 +502,7 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
 
   const statusFilteredRecords = useMemo(() => {
     if (!isResultsPage || resultStatusTab === 'all') return filteredRecords
-    const expected = resultStatusTab === 'uploaded' ? '已上传' : '待上传'
+    const expected = resultStatusTab === 'uploaded' ? '已上线' : '建设中'
     return filteredRecords.filter((item) => recordDisplayMeta(item).status === expected)
   }, [filteredRecords, isResultsPage, resultStatusTab])
 
@@ -720,8 +720,8 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
               <strong><b>{statusFilteredRecords.length}</b> 个结果</strong>
               <div className="result-status-tabs" role="tablist" aria-label="上传状态">
                 <button type="button" className={resultStatusTab === 'all' ? 'is-active' : ''} onClick={() => { setResultStatusTab('all'); setCurrentPage(1) }}>全部</button>
-                <button type="button" className={resultStatusTab === 'uploaded' ? 'is-active' : ''} onClick={() => { setResultStatusTab('uploaded'); setCurrentPage(1) }}>已上传</button>
-                <button type="button" className={resultStatusTab === 'pending' ? 'is-active' : ''} onClick={() => { setResultStatusTab('pending'); setCurrentPage(1) }}>待上传</button>
+                <button type="button" className={resultStatusTab === 'uploaded' ? 'is-active' : ''} onClick={() => { setResultStatusTab('uploaded'); setCurrentPage(1) }}>已上线</button>
+                <button type="button" className={resultStatusTab === 'pending' ? 'is-active' : ''} onClick={() => { setResultStatusTab('pending'); setCurrentPage(1) }}>建设中</button>
               </div>
             </div>
             <label className="catalog-sort-control">
@@ -741,7 +741,7 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
               return (
               <Link className="catalog-corpus-card" to={cardTarget} target="_blank" rel="noreferrer" key={item.id}>
                 <div className="quality-card-visual catalog-card-visual" aria-hidden="true">
-                  <span className="card-status-overlay is-partial">公开</span>
+                  <span className={`card-status-overlay ${item.openness === '不公开' ? 'is-private' : 'is-partial'}`}>{item.openness === '不公开' ? '不公开' : '公开'}</span>
                   <span className="visual-line visual-line-one" />
                   <span className="visual-line visual-line-two" />
                   <span className="visual-node node-one" />
@@ -784,7 +784,7 @@ export default function CorpusSearch({ pageType = 'search' }: { pageType?: 'sear
         ) : (
           <div className="catalog-empty-state">
             <Search size={28} />
-            <strong>暂未找到匹配语料</strong>
+            <strong>搜索无结果</strong>
             <p>请调整检索词、逻辑关系或发布时间范围后重新检索。</p>
           </div>
         )}
