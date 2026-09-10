@@ -36,7 +36,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useApp } from '../context/app-context'
 import { corpusRecords, recordDisplayMeta } from './CorpusSearch'
 
@@ -327,7 +327,11 @@ export default function DatasetDetail() {
   const openness = detailOpennessLabel(item.openness)
   const favorite = favorites.some((record) => record.id === item.id)
 
-  const [activeTab, setActiveTab] = useState<DetailTab>('intro')
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState<DetailTab>(() => {
+    const tab = searchParams.get('tab')
+    return tab === 'comments' || tab === 'download' ? tab : 'intro'
+  })
   const [selectedFile, setSelectedFile] = useState('metadata.json')
   const [previewSidebarCollapsed, setPreviewSidebarCollapsed] = useState(false)
   const [fullscreenBrowser, setFullscreenBrowser] = useState<'intro' | 'download' | null>(null)
