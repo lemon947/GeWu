@@ -38,8 +38,8 @@ export default function AuthDialog() {
   const closeDialog = useCallback(() => {
     resetSensitiveFields()
     closeAuth()
-    if (location.pathname === '/upload') {
-      navigate('/')
+    if (location.pathname === '/upload/form') {
+      navigate('/upload')
       return
     }
     const protectedCorpusPage = location.pathname.startsWith('/search/results')

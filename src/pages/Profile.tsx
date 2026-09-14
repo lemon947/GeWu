@@ -10,7 +10,6 @@ import {
   Heart,
   MessageCircle,
   Pencil,
-  Plus,
   Search,
   ShieldCheck,
   Star,
@@ -23,13 +22,14 @@ import { corpusRecords, type CorpusRecord } from './CorpusSearch'
 import { DemandPoster, initialDemandPosts, type DemandPost } from './DemandSquare'
 import { auditWorkStatusOptions, loadAuditItems, removeAuditItemByCorpus, type AuditWorkItem, type AuditWorkStatus } from '../data/audit-work'
 
-type MainTab = 'corpora' | 'demands' | 'submit' | 'audit' | 'privacy'
-type CorpusTab = 'managed' | 'joined' | 'favorite'
-type DemandTab = 'published' | 'favorited' | 'commented' | 'following' | 'followers'
+type MainTab = 'corpora' | 'demands' | 'social' | 'submit' | 'audit' | 'privacy'
+type CorpusTab = 'managed' | 'joined' | 'favorite' | 'commented'
+type DemandTab = 'published' | 'favorited' | 'commented'
+type SocialTab = '关注' | '粉丝'
 type NoticeTab = 'audit' | 'comment'
 type ModalType = 'avatar' | 'basic' | null
-type PrivacyKey = '我管理的语料库' | '我加入的语料库' | '我收藏的语料库' | '已发布的需求' | '已收藏的需求' | '已评论的需求' | '我的关注' | '我的粉丝'
-type PrivacyValue = '公开' | '仅关注我的人可见' | '仅自己可见'
+type SimplePrivacy = '公开' | '不公开'
+type FollowPrivacy = '全部公开' | '仅公开关注列表' | '仅公开粉丝列表' | '全部私密'
 
 type UserProfile = {
   username: string
@@ -82,6 +82,7 @@ function corpusByIds(ids: string[]) {
 const managedIds = ['math-01', 'physics-01', 'chem-01']
 const joinedIds = ['geo-04', 'bio-02', 'astro-02', 'math-03', 'physics-02', 'chem-04', 'astro-04', 'geo-03', 'physics-04', 'geo-01', 'math-02', 'bio-01']
 const favoriteDefaultIds = ['chem-01', 'physics-02', 'geo-01', 'bio-02', 'math-02', 'astro-01', 'geo-04', 'physics-03']
+const commentedCorpusIds = ['math-01', 'physics-01', 'geo-01', 'chem-02', 'astro-02', 'bio-02', 'math-03']
 
 const communityUsers: CommunityUser[] = [
   { id: 'user-lin', name: '林知远', role: '材料语料发起人 · 北京大学化学与分子工程学院', following: true },
@@ -95,20 +96,16 @@ const communityUsers: CommunityUser[] = [
 ]
 
 const notices: Notice[] = [
-  { id: 1, role: 'admin', kind: 'pending', corpusId: 'math-01', corpusName: '基础数学定理证明长思维链语料', userName: '李思远', time: '2026-09-05 14:22', permission: '可上传' },
-  { id: 2, role: 'admin', kind: 'pending', corpusId: 'physics-01', corpusName: '量子力学问题求解与推理过程语料', userName: '建设编辑', time: '2026-09-06 09:10' },
+  { id: 1, role: 'admin', kind: 'pending', corpusId: 'math-01', corpusName: '基础数学定理证明长思维链语料', userName: '李思远', time: '2026-09-05 14:22' },
+  { id: 2, role: 'admin', kind: 'pending', corpusId: 'physics-01', corpusName: '量子力学问题求解与推理过程语料', userName: '建设编辑', time: '2026-09-06 09:10', permission: '可上传' },
   { id: 3, role: 'uploader', kind: 'approved', corpusId: 'math-02', corpusName: '概率论与数理统计问题求解语料', userName: '王磊', time: '2026-09-04 16:40' },
   { id: 4, role: 'uploader', kind: 'rejected', corpusId: 'chem-04', corpusName: '环境化学专业问答与推理语料', userName: '何静', time: '2026-09-03 11:05', reason: '数据样例不足，请补充字段口径说明' },
   { id: 5, role: 'member', kind: 'approved', corpusId: 'geo-04', corpusName: '城市空间结构与功能区识别语料', userName: '许青', time: '2026-09-02 10:18', permission: '可上传' },
   { id: 6, role: 'member', kind: 'rejected', corpusId: 'bio-02', corpusName: '代谢小分子化合物结构语料', userName: '张伟', time: '2026-09-01 15:47', reason: '单位与实名信息不符', permission: '可管理' },
-  { id: 7, role: 'creator', kind: 'returned', corpusId: 'astro-04', corpusName: '射电天文观测数据与说明语料', userName: '许青', time: '2026-08-30 09:32', createdAt: '2026-08-28 10:00', reason: '请补充样例数据来源说明' },
-  { id: 8, role: 'creator', kind: 'rejected', corpusId: 'bio-01', corpusName: '跨物种细胞调控图谱语料', userName: '张伟', time: '2026-08-29 13:22', createdAt: '2026-08-27 11:30', reason: '授权材料暂不完整' },
-  { id: 9, role: 'creator', kind: 'failed', corpusId: 'chem-02', corpusName: 'CarbonMat 碳材料横向关联语料库', userName: '林知远', time: '2026-08-28 18:16', createdAt: '2026-08-26 09:40' },
-  { id: 10, role: 'creator', kind: 'published', corpusId: 'geo-01', corpusName: '中国典型城市高分辨率遥感影像语料', userName: '王磊', time: '2026-08-27 10:05', createdAt: '2026-08-24 14:00' },
-  { id: 11, role: 'platform', kind: 'pending', corpusId: 'geo-01', corpusName: '中国典型城市高分辨率遥感影像语料', userName: '王磊', time: '2026-09-06 17:20' },
-  { id: 12, role: 'platform', kind: 'modified', corpusId: 'math-03', corpusName: '数学公式识别与语义解析语料', userName: '陈明', time: '2026-09-05 09:24' },
-  { id: 13, role: 'platform', kind: 'withdrawn', corpusId: 'physics-03', corpusName: '高能物理实验事例结构化语料', userName: '李思远', time: '2026-09-04 12:18' },
-  { id: 14, role: 'platform', kind: 'failed', corpusId: 'astro-01', corpusName: '天体测量与天体力学多模态语料', userName: '许青', time: '2026-09-03 18:50' },
+  { id: 7, role: 'creator', kind: 'returned', corpusId: 'math-01', corpusName: '数学教育教学语料库', userName: '我', time: '2026-08-30 09:32', createdAt: '2026-08-28 10:00', reason: '请补充字段口径说明' },
+  { id: 8, role: 'creator', kind: 'rejected', corpusId: 'chem-02', corpusName: '天然产物结构语料库', userName: '我', time: '2026-08-31 14:05', createdAt: '2026-08-29 15:20', reason: '数据样例不足，请补充字段口径说明' },
+  { id: 9, role: 'creator', kind: 'failed', corpusId: 'geo-03', corpusName: '极端天气事件语料库', userName: '我', time: '2026-09-02 18:30', createdAt: '2026-09-01 09:40', reason: '系统发布服务超时，自动发布失败，请稍后重试' },
+  { id: 10, role: 'creator', kind: 'published', corpusId: 'astro-04', corpusName: '天文观测语料库', userName: '我', time: '2026-08-27 10:00', createdAt: '2026-08-25 11:30' },
 ]
 
 const commentNotices: CommentNotice[] = [
@@ -118,7 +115,7 @@ const commentNotices: CommentNotice[] = [
   { id: 4, user: '李思远', text: '请问可以扩展语音方言类的共建需求吗？', time: '2026-08-30', kind: 'demand', targetId: 'demand-geo-001' },
 ]
 
-type SubmitStatus = '草稿' | '审核中' | '待修改' | '已通过' | '未通过' | '发布异常' | '已发布' | '已撤回' | '已上传'
+type SubmitStatus = '审核中' | '待修改' | '已通过' | '未通过' | '发布异常' | '已发布' | '已撤回' | '已上传'
 type SubmitRecord = {
   id: number
   corpusName: string
@@ -130,7 +127,7 @@ type SubmitRecord = {
   opinion?: string
 }
 
-const submitStatusOptions: SubmitStatus[] = ['草稿', '审核中', '待修改', '已通过', '未通过', '发布异常', '已发布', '已撤回']
+const submitStatusOptions: SubmitStatus[] = ['审核中', '待修改', '已通过', '未通过', '发布异常', '已发布', '已撤回']
 
 const submitRecords: SubmitRecord[] = [
   { id: 1, corpusName: '数学教育教学语料库', type: '新建语料库', submittedAt: '2026-09-07 10:25', status: '审核中', corpusId: 'math-01' },
@@ -140,7 +137,6 @@ const submitRecords: SubmitRecord[] = [
   { id: 5, corpusName: '极端天气事件语料库', type: '新建语料库', submittedAt: '2026-09-02 17:20', status: '发布异常', corpusId: 'geo-03', reason: '系统发布服务超时，自动发布失败，请稍后重试' },
   { id: 6, corpusName: '生物机理分析语料库', type: '新建语料库', submittedAt: '2026-08-31 14:10', status: '已发布', corpusId: 'bio-04' },
   { id: 7, corpusName: '量子力学问题语料库', type: '新建语料库', submittedAt: '2026-08-29 10:12', status: '已撤回', corpusId: 'physics-01' },
-  { id: 8, corpusName: '数学概率论语料库', type: '新建语料库', submittedAt: '2026-08-28 09:00', status: '草稿', corpusId: 'math-02' },
   { id: 9, corpusName: '光学实验视频语料库', type: '上传语料', submittedAt: '2026-09-06 16:20', status: '审核中', corpusId: 'physics-04' },
   { id: 10, corpusName: '星系光谱语料库', type: '上传语料', submittedAt: '2026-08-30 11:47', status: '已通过', corpusId: 'astro-02' },
   { id: 11, corpusName: '代谢小分子语料库', type: '上传语料', submittedAt: '2026-08-27 15:03', status: '未通过', corpusId: 'bio-02', reason: '文件清单与备案数据不一致，请核对后重新提交' },
@@ -148,8 +144,8 @@ const submitRecords: SubmitRecord[] = [
 ]
 
 
-const privacyOptions: PrivacyValue[] = ['公开', '仅关注我的人可见', '仅自己可见']
-const privacyKeys: PrivacyKey[] = ['我管理的语料库', '我加入的语料库', '我收藏的语料库', '已发布的需求', '已收藏的需求', '已评论的需求', '我的关注', '我的粉丝']
+const simplePrivacyOptions: SimplePrivacy[] = ['公开', '不公开']
+const followPrivacyOptions: FollowPrivacy[] = ['全部公开', '仅公开关注列表', '仅公开粉丝列表', '全部私密']
 
 const demandPageSize = 6
 
@@ -180,7 +176,7 @@ function noticeView(notice: Notice) {
     return { title: '您的语料上传审核已通过', body: `您向“${notice.corpusName}”提交的语料上传申请已通过审核，相关语料已成功加入该语料库`, action: '查看语料', to: `/search/datasets/${notice.corpusId}` }
   }
   if (notice.role === 'uploader' && notice.kind === 'rejected') {
-    return { title: '您的语料上传申请未通过', body: `您向“${notice.corpusName}”提交的语料上传申请未通过审核，请根据审核意见修改后重新提交。审核意见：${notice.reason}；`, action: '查看申请', to: `/search/datasets/${notice.corpusId}` }
+    return { title: '您的语料上传申请未通过', body: `您向“${notice.corpusName}”提交的语料上传申请未通过审核，请根据审核意见修改后重新提交。审核意见：${notice.reason}；`, action: '继续申请', to: `/search/datasets/${notice.corpusId}` }
   }
   if (notice.role === 'member' && notice.kind === 'approved') {
     return { title: `您的加入${notice.corpusName}（${notice.permission}）审核已通过`, body: `您向“${notice.corpusName}”提交的加入申请已通过审核`, action: '查看语料', to: `/search/datasets/${notice.corpusId}` }
@@ -189,9 +185,9 @@ function noticeView(notice: Notice) {
     return { title: `您的加入${notice.corpusName}（${notice.permission}）未通过审核`, body: `您向“${notice.corpusName}”提交的加入申请未通过审核；审核意见：${notice.reason}；`, action: '查看语料', to: `/search/datasets/${notice.corpusId}` }
   }
   if (notice.role === 'creator') {
-    if (notice.kind === 'returned') return { title: `您申请创建的${notice.corpusName}待修改`, body: `您于${notice.createdAt}创建的“${notice.corpusName}”提交内容需要补充或修改材料，请根据审核意见调整后重新提交。审核意见：${notice.reason}`, action: '查看意见', to: '/profile?tab=submissions' }
-    if (notice.kind === 'rejected') return { title: `您申请创建的${notice.corpusName}未通过审核`, body: `您于${notice.createdAt}创建的“${notice.corpusName}”申请未通过，请查看审核意见。审核意见：${notice.reason}`, action: '查看原因', to: '/profile?tab=submissions' }
-    if (notice.kind === 'failed') return { title: `您申请创建的${notice.corpusName}发布异常`, body: `您于${notice.createdAt}创建的“${notice.corpusName}”已通过审核，但发布未完成，请查看处理进度。`, action: '查看进度', to: '/profile?tab=submissions' }
+    if (notice.kind === 'returned') return { title: `您申请创建的${notice.corpusName}待修改`, body: `您于${notice.createdAt}创建的“${notice.corpusName}”提交内容需要补充或修改材料，请根据审核意见调整后重新提交。审核意见：${notice.reason}`, action: '查看意见', to: '/profile?tab=submit&sstatus=待修改' }
+    if (notice.kind === 'rejected') return { title: `您申请创建的${notice.corpusName}未通过审核`, body: `您于${notice.createdAt}创建的“${notice.corpusName}”申请未通过，请查看审核意见。审核意见：${notice.reason}`, action: '查看原因', to: '/profile?tab=submit&sstatus=未通过' }
+    if (notice.kind === 'failed') return { title: `您申请创建的${notice.corpusName}发布异常`, body: `您于${notice.createdAt}创建的“${notice.corpusName}”已通过审核，但发布未完成，请查看处理进度。`, action: '查看进度', to: '/profile?tab=submit&sstatus=发布异常' }
     return { title: `您创建的${notice.corpusName}已正式发布`, body: `您于${notice.createdAt}创建的“${notice.corpusName}”已通过审核并发布成功，可在个人主页和语料详情页查看。`, action: '查看语料', to: `/search/datasets/${notice.corpusId}` }
   }
   if (notice.role === 'platform') {
@@ -215,13 +211,15 @@ export default function Profile() {
     setSearchParams(next, { replace: true })
   }
   const tabParam = searchParams.get('tab')
-  const activeTab: MainTab = tabParam === 'demands' || tabParam === 'submit' || tabParam === 'audit' || tabParam === 'privacy' ? tabParam : 'corpora'
+  const activeTab: MainTab = tabParam === 'demands' || tabParam === 'social' || tabParam === 'submit' || tabParam === 'audit' || tabParam === 'privacy' ? tabParam : 'corpora'
   const setActiveTab = (tab: MainTab) => updateParams({ tab: tab === 'corpora' ? null : tab })
   const [corpusTab, setCorpusTab] = useState<CorpusTab>('managed')
   const [demandTab, setDemandTab] = useState<DemandTab>('published')
   const [noticeTab, setNoticeTab] = useState<NoticeTab>('audit')
+  const [socialTab, setSocialTab] = useState<SocialTab>('关注')
   const [modal, setModal] = useState<ModalType>(null)
   const [noticeItem, setNoticeItem] = useState<Notice | null>(null)
+  const [readNotices, setReadNotices] = useState<Set<number>>(new Set())
   const [profile, setProfile] = useState<UserProfile>(() => user ? loadProfile(user.account, user.name) : emptyProfile())
   const [draft, setDraft] = useState<UserProfile>(profile)
   const [avatarDraft, setAvatarDraft] = useState('')
@@ -231,9 +229,11 @@ export default function Profile() {
   const [corpusPage, setCorpusPage] = useState(1)
   const [demandPage, setDemandPage] = useState(1)
   const [userFollowed, setUserFollowed] = useState<Record<string, boolean>>(() => Object.fromEntries(communityUsers.map((u) => [u.id, u.following])))
-  const [privacy, setPrivacy] = useState<Record<PrivacyKey, PrivacyValue>>(() => Object.fromEntries(privacyKeys.map((key) => [key, '公开' as PrivacyValue])) as Record<PrivacyKey, PrivacyValue>)
+  const [privacyFavorite, setPrivacyFavorite] = useState<SimplePrivacy>('公开')
+  const [privacyCommented, setPrivacyCommented] = useState<SimplePrivacy>('公开')
+  const [privacyFollow, setPrivacyFollow] = useState<FollowPrivacy>('全部公开')
   const submitStatusParam = searchParams.get('sstatus')
-  const submitStatus: '全部' | SubmitStatus = (['草稿', '审核中', '待修改', '已通过', '未通过', '发布异常', '已发布', '已撤回'] as SubmitStatus[]).includes(submitStatusParam as SubmitStatus) ? submitStatusParam as SubmitStatus : '全部'
+  const submitStatus: '全部' | SubmitStatus = (['审核中', '待修改', '已通过', '未通过', '发布异常', '已发布', '已撤回'] as SubmitStatus[]).includes(submitStatusParam as SubmitStatus) ? submitStatusParam as SubmitStatus : '全部'
   const setSubmitStatus = (status: '全部' | SubmitStatus) => {
     updateParams({ sstatus: status === '全部' ? null : status })
     setSubmitPage(1)
@@ -275,7 +275,8 @@ export default function Profile() {
   const joinedCorpora = corpusByIds(joinedIds)
   const favoriteCorpora = corpusByIds(favoriteIds)
 
-  const corpusList = corpusTab === 'managed' ? managedCorpora : corpusTab === 'joined' ? joinedCorpora : favoriteCorpora
+  const commentedCorpora = corpusByIds(commentedCorpusIds)
+  const corpusList = corpusTab === 'managed' ? managedCorpora : corpusTab === 'joined' ? joinedCorpora : corpusTab === 'commented' ? commentedCorpora : favoriteCorpora
   const visibleCorpora = corpusList.slice((corpusPage - 1) * 6, corpusPage * 6)
 
   const demandMap: Record<'published' | 'favorited' | 'commented', DemandPost[]> = {
@@ -286,7 +287,7 @@ export default function Profile() {
   const visibleDemands = demandTab === 'published' || demandTab === 'favorited' || demandTab === 'commented'
     ? demandMap[demandTab].slice((demandPage - 1) * demandPageSize, demandPage * demandPageSize)
     : []
-  const filteredUsers = demandTab === 'following' ? communityUsers.filter((item) => userFollowed[item.id]) : communityUsers
+  const filteredUsers = socialTab === '关注' ? communityUsers.filter((item) => userFollowed[item.id]) : communityUsers
   const visibleUsers = filteredUsers.slice((demandPage - 1) * demandPageSize, demandPage * demandPageSize)
   const totalCollected = 356 + initialDemandPosts.reduce((sum, item) => sum + item.bookmarks, 0)
 
@@ -466,8 +467,8 @@ export default function Profile() {
             {noticeTab === 'audit' ? (
               <div className="profile-notice-list">
                 {notices.map((notice) => (
-                  <button type="button" className="profile-notice-item" key={notice.id} onClick={() => setNoticeItem(notice)}>
-                    <strong>系统通知</strong>
+                  <button type="button" className="profile-notice-item" key={notice.id} onClick={() => { setNoticeItem(notice); setReadNotices((current) => new Set(current).add(notice.id)) }}>
+                    <strong>系统通知{!readNotices.has(notice.id) && <i className="profile-notice-dot" aria-label="未读" />}</strong>
                     <p>{notice.role === 'admin' && notice.kind === 'pending' ? `您有一条${notice.permission ? '加入语料库' : '上传语料'}的申请待审核` : noticeView(notice).title}</p>
                     <small>{notice.time}</small>
                   </button>
@@ -494,8 +495,11 @@ export default function Profile() {
           <nav className="profile-main-tabs">
             <button type="button" className={activeTab === 'corpora' ? 'is-active' : ''} onClick={() => { setActiveTab('corpora'); setCorpusPage(1) }}>我的语料库</button>
             <button type="button" className={activeTab === 'demands' ? 'is-active' : ''} onClick={() => { setActiveTab('demands'); setDemandPage(1) }}>需求动态</button>
-            <button type="button" className={activeTab === 'submit' ? 'is-active' : ''} onClick={() => { setActiveTab('submit'); setSubmitPage(1) }}>我的汇交</button>
+            <button type="button" className={activeTab === 'social' ? 'is-active' : ''} onClick={() => setActiveTab('social')}>关注与粉丝</button>
+            <button type="button" className={activeTab === 'submit' ? 'is-active' : ''} onClick={() => { setActiveTab('submit'); setSubmitPage(1) }}>汇交记录</button>
+            {/* 审核工作台暂不上线，保留代码备用
             <button type="button" className={activeTab === 'audit' ? 'is-active' : ''} onClick={() => setActiveTab('audit')}>审核工作台</button>
+            */}
             <button type="button" className={activeTab === 'privacy' ? 'is-active' : ''} onClick={() => setActiveTab('privacy')}>隐私设置</button>
           </nav>
 
@@ -504,7 +508,7 @@ export default function Profile() {
               <header className="profile-section-header">
                 <h2>我的语料库</h2>
                 <div className="profile-sub-tabs">
-                  {([['managed', '我管理的'], ['joined', '我加入的'], ['favorite', '我收藏的']] as Array<[CorpusTab, string]>).map(([key, label]) => (
+                  {([['managed', '我管理的'], ['joined', '我加入的'], ['favorite', '我收藏的'], ['commented', '我评论的']] as Array<[CorpusTab, string]>).map(([key, label]) => (
                     <button type="button" className={corpusTab === key ? 'is-active' : ''} key={key} onClick={() => { setCorpusTab(key); setCorpusPage(1) }}>{label}</button>
                   ))}
                 </div>
@@ -551,7 +555,7 @@ export default function Profile() {
               <header className="profile-section-header">
                 <h2>需求动态</h2>
                 <div className="profile-sub-tabs">
-                  {([['published', '已发布'], ['favorited', '已收藏'], ['commented', '已评论'], ['following', '关注'], ['followers', '粉丝']] as Array<[DemandTab, string]>).map(([key, label]) => (
+                  {([['published', '已发布'], ['favorited', '已收藏'], ['commented', '已评论']] as Array<[DemandTab, string]>).map(([key, label]) => (
                     <button type="button" className={demandTab === key ? 'is-active' : ''} key={key} onClick={() => { setDemandTab(key); setDemandPage(1) }}>{label}</button>
                   ))}
                 </div>
@@ -582,33 +586,39 @@ export default function Profile() {
                   <Pager total={demandMap[demandTab as 'published'].length} pageSize={demandPageSize} current={demandPage} onChange={setDemandPage} />
                 </>
               )}
-              {(demandTab === 'following' || demandTab === 'followers') && (
-                <>
-                  <div className="profile-user-grid">
-                    {visibleUsers.map((item) => {
-                      const followed = userFollowed[item.id]
-                      const label = demandTab === 'followers'
-                        ? (item.mutual ? '互相关注' : '关注')
-                        : (item.mutual ? '互相关注' : '已关注')
-                      return (
-                        <article className="profile-user-card" key={item.id}>
-                          <span className="profile-user-avatar">{item.name.slice(0, 1)}</span>
-                          <div><strong>{item.name}</strong><small>{item.role}</small></div>
-                          <button
-                            type="button"
-                            className={followed ? 'is-followed is-hoverable' : ''}
-                            data-tooltip={label !== '关注' ? '取消关注' : undefined}
-                            onClick={() => setUserFollowed((current) => ({ ...current, [item.id]: !current[item.id] }))}
-                          >
-                            {label}
-                          </button>
-                        </article>
-                      )
-                    })}
-                  </div>
-                  <Pager total={filteredUsers.length} pageSize={demandPageSize} current={demandPage} onChange={setDemandPage} />
-                </>
-              )}
+            </>
+          )}
+
+          {activeTab === 'social' && (
+            <>
+              <div className="profile-sub-tabs">
+                {(['关注', '粉丝'] as SocialTab[]).map((key) => (
+                  <button type="button" className={socialTab === key ? 'is-active' : ''} key={key} onClick={() => { setSocialTab(key); setDemandPage(1) }}>{key}</button>
+                ))}
+              </div>
+              <div className="profile-user-grid">
+                {visibleUsers.map((item) => {
+                  const followed = userFollowed[item.id]
+                  const label = socialTab === '粉丝'
+                    ? (followed ? '互相关注' : '关注')
+                    : (followed ? (item.mutual ? '互相关注' : '已关注') : '关注')
+                  return (
+                    <article className="profile-user-card" key={item.id}>
+                      <span className="profile-user-avatar">{item.name.slice(0, 1)}</span>
+                      <div><strong>{item.name}</strong><small>{item.role}</small></div>
+                      <button
+                        type="button"
+                        className={followed ? 'is-followed is-hoverable' : ''}
+                        data-tooltip={label !== '关注' ? '取消关注' : undefined}
+                        onClick={() => setUserFollowed((current) => ({ ...current, [item.id]: !current[item.id] }))}
+                      >
+                        {label}
+                      </button>
+                    </article>
+                  )
+                })}
+              </div>
+              <Pager total={filteredUsers.length} pageSize={demandPageSize} current={demandPage} onChange={setDemandPage} />
             </>
           )}
 
@@ -636,7 +646,6 @@ export default function Profile() {
                       </button>
                     ))}
                   </div>
-                  <Link className="submit-create" to="/upload"><Plus size={15} />新建汇交</Link>
                 </div>
                 <div className="submit-search-row submit-search-right">
                   <label className="submit-search"><Search size={16} /><input value={submitKeyword} onChange={(event) => { setSubmitKeyword(event.target.value); setSubmitPage(1) }} placeholder="搜索语料库名称" /></label>
@@ -673,12 +682,7 @@ export default function Profile() {
                           <td>
                             <div className="submit-actions">
                               {record.type === '新建语料库' && (
-                                record.status === '草稿' ? (
-                                  <>
-                                    <button type="button" onClick={() => navigate('/upload')}>继续编辑</button>
-                                    <button type="button" className="is-danger" onClick={() => setSubmitConfirm({ title: '删除草稿', message: `确定删除「${record.corpusName}」的草稿吗？删除后不可恢复。`, confirmLabel: '确认删除', recordId: record.id, action: 'delete', corpusName: record.corpusName })}>删除草稿</button>
-                                  </>
-                                ) : record.status === '审核中' ? (
+                                record.status === '审核中' ? (
                                   <>
                                     <button type="button" onClick={() => navigate(`/search/datasets/${record.corpusId}`)}>预览内容</button>
                                     <button type="button" onClick={() => withdraw(record)}>撤回申请</button>
@@ -686,7 +690,7 @@ export default function Profile() {
                                 ) : record.status === '待修改' ? (
                                   <>
                                     <button type="button" onClick={() => setReasonModal({ title: '修改意见', reason: record.opinion ?? '' })}>查看意见</button>
-                                    <button type="button" onClick={() => navigate('/upload')}>修改提交</button>
+                                    <button type="button" onClick={() => navigate('/upload/form')}>修改提交</button>
                                     <button type="button" onClick={() => withdraw(record)}>撤回申请</button>
                                   </>
                                 ) : record.status === '已通过' ? (
@@ -703,7 +707,7 @@ export default function Profile() {
                                 ) : (
                                   <>
                                     <button type="button" onClick={() => navigate(`/search/datasets/${record.corpusId}`)}>预览内容</button>
-                                    <button type="button" onClick={() => navigate('/upload')}>编辑并重新提交</button>
+                                    <button type="button" onClick={() => navigate('/upload/form')}>编辑并重新提交</button>
                                   </>
                                 )
                               )}
@@ -815,14 +819,24 @@ export default function Profile() {
           {activeTab === 'privacy' && (
             <div className="profile-privacy">
               <p className="profile-privacy-intro">设置个人主页对外展示内容的可见范围</p>
-              {privacyKeys.map((key) => (
-                <label className="profile-privacy-row" key={key}>
-                  <span>{key}</span>
-                  <select value={privacy[key]} onChange={(event) => setPrivacy((current) => ({ ...current, [key]: event.target.value as PrivacyValue }))}>
-                    {privacyOptions.map((option) => <option key={option}>{option}</option>)}
-                  </select>
-                </label>
-              ))}
+              <label className="profile-privacy-row">
+                <span>我收藏的</span>
+                <select value={privacyFavorite} onChange={(event) => setPrivacyFavorite(event.target.value as SimplePrivacy)}>
+                  {simplePrivacyOptions.map((option) => <option key={option}>{option}</option>)}
+                </select>
+              </label>
+              <label className="profile-privacy-row">
+                <span>我评论的</span>
+                <select value={privacyCommented} onChange={(event) => setPrivacyCommented(event.target.value as SimplePrivacy)}>
+                  {simplePrivacyOptions.map((option) => <option key={option}>{option}</option>)}
+                </select>
+              </label>
+              <label className="profile-privacy-row">
+                <span>关注与粉丝列表</span>
+                <select value={privacyFollow} onChange={(event) => setPrivacyFollow(event.target.value as FollowPrivacy)}>
+                  {followPrivacyOptions.map((option) => <option key={option}>{option}</option>)}
+                </select>
+              </label>
             </div>
           )}
         </section>

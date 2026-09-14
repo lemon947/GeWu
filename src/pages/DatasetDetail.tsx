@@ -637,6 +637,7 @@ export default function DatasetDetail() {
   }
 
   const goBack = () => {
+    // 返回到上一页（来源不固定），无历史时回退到语料检索页
     if (window.history.length > 1) {
       navigate(-1)
       return

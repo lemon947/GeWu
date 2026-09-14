@@ -3,9 +3,11 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  ClipboardList,
   Copy,
   FileArchive,
   FileText,
+  FolderArchive,
   Github,
   Link2,
   Plus,
@@ -36,6 +38,55 @@ export const provinces = ['北京市', '天津市', '河北省', '山西省', '�
 const emptyAuthor = (): Author => ({ name: '', contact: '', organization: '' })
 const emptyUpload = (): UploadGroupState => ({ mode: 'local', files: [], link: '', linkKind: 'url' })
 const cli_upload_cmd = 'corpusware upload --corpus <语料ID> --data ./corpus'
+
+type UploadDraftData = {
+  taskName: string
+  authors: Author[]
+  corpusName: string
+  introduction: string
+  keywords: string[]
+  dataSource: string
+  selectedSubjects: string[]
+  selectedChildren: Record<string, string[]>
+  corpusType: string
+  orgType: string
+  organization: string
+  department: string
+  customOrganization: string
+  customDepartment: string
+  province: string
+  corpusSize: string
+  corpusSizeDetail: string
+  storageSize: string
+  storageSizeDetail: string
+  supplyStatus: string
+  supplyMode: string
+  license: string
+  openness: string
+  uploads: Record<UploadGroupKey, UploadGroupState>
+}
+type UploadDraft = { id: string; savedAt: string; step: number; data: UploadDraftData }
+
+const draftStorageKey = (account: string) => `gw-upload-drafts-${account}`
+
+function loadDraftList(account: string): UploadDraft[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(draftStorageKey(account)) ?? '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function persistDraftList(account: string, list: UploadDraft[]) {
+  window.localStorage.setItem(draftStorageKey(account), JSON.stringify(list))
+}
+
+function draftStamp() {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  const date = new Date()
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
 
 function groupLabel(state: UploadGroupState) {
   if (state.mode === 'local') return `${state.files.length} 个文件`
@@ -101,8 +152,12 @@ export default function CorpusUpload() {
   const [searchParams] = useSearchParams()
   const editRecord = useMemo(() => corpusRecords.find((item) => item.id === searchParams.get('edit')), [searchParams])
   const [step, setStep] = useState(1)
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [draftsOpen, setDraftsOpen] = useState(false)
+  const [draftList, setDraftList] = useState<UploadDraft[]>(() => user ? loadDraftList(user.account) : [])
   const [toast, setToast] = useState('')
   const [authors, setAuthors] = useState<Author[]>([emptyAuthor()])
+  const [taskName, setTaskName] = useState('')
   const [corpusName, setCorpusName] = useState(editRecord?.title ?? '')
   const [introduction, setIntroduction] = useState(editRecord?.summary ?? '')
   const [keywordInput, setKeywordInput] = useState('')
@@ -128,7 +183,7 @@ export default function CorpusUpload() {
   const [uploads, setUploads] = useState<Record<UploadGroupKey, UploadGroupState>>({ sample: emptyUpload(), public: emptyUpload(), all: emptyUpload() })
 
   useEffect(() => {
-    if (!user) openAuth('/upload')
+    if (!user) openAuth('/upload/form')
   }, [openAuth, user])
 
   const notify = (message: string) => {
@@ -167,10 +222,63 @@ export default function CorpusUpload() {
     if (!next.length) setSelectedSubjects((items) => items.filter((item) => item !== subject))
   }
 
-  const saveDraft = () => {
+  const saveDraft = (silent = false) => {
+    if (!user) return draftId
+    const id = draftId ?? `draft-${Date.now()}`
+    const record: UploadDraft = {
+      id,
+      savedAt: draftStamp(),
+      step,
+      data: { taskName, authors, corpusName, introduction, keywords, dataSource, selectedSubjects, selectedChildren, corpusType, orgType, organization, department, customOrganization, customDepartment, province, corpusSize, corpusSizeDetail, storageSize, storageSizeDetail, supplyStatus, supplyMode, license, openness, uploads },
+    }
+    const next = [record, ...loadDraftList(user.account).filter((item) => item.id !== id)]
+    persistDraftList(user.account, next)
+    setDraftList(next)
+    setDraftId(id)
+    if (!silent) notify('当前内容已保存到草稿箱')
+    return id
+  }
+
+  const applyDraft = (record: UploadDraft) => {
+    const data = record.data
+    setTaskName(data.taskName ?? '')
+    setAuthors(data.authors)
+    setCorpusName(data.corpusName)
+    setIntroduction(data.introduction)
+    setKeywords(data.keywords ?? [])
+    setDataSource(data.dataSource)
+    setSelectedSubjects(data.selectedSubjects)
+    setSelectedChildren(data.selectedChildren)
+    setCorpusType(data.corpusType)
+    setOrgType(data.orgType)
+    setOrganization(data.organization)
+    setDepartment(data.department)
+    setCustomOrganization(data.customOrganization)
+    setCustomDepartment(data.customDepartment)
+    setProvince(data.province)
+    setCorpusSize(data.corpusSize)
+    setCorpusSizeDetail(data.corpusSizeDetail)
+    setStorageSize(data.storageSize)
+    setStorageSizeDetail(data.storageSizeDetail)
+    setSupplyStatus(data.supplyStatus)
+    setSupplyMode(data.supplyMode)
+    setLicense(data.license)
+    setOpenness(data.openness)
+    setUploads(data.uploads)
+    setDraftId(record.id)
+    setStep(Math.min(Math.max(record.step, 1), 3))
+    setDraftsOpen(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    notify(`已载入草稿（第 ${Math.min(Math.max(record.step, 1), 3)} 步）`)
+  }
+
+  const removeDraft = (id: string) => {
     if (!user) return
-    window.localStorage.setItem(`gw-upload-draft-${user.account}`, JSON.stringify({ authors, corpusName, introduction, keywords, dataSource, selectedSubjects, selectedChildren, corpusType, orgType, organization, department, customOrganization, customDepartment, province, corpusSize, corpusSizeDetail, storageSize, storageSizeDetail, supplyStatus, supplyMode, license, openness, uploads, step }))
-    notify('当前内容已保存')
+    const next = loadDraftList(user.account).filter((item) => item.id !== id)
+    persistDraftList(user.account, next)
+    setDraftList(next)
+    if (draftId === id) setDraftId(null)
+    notify('草稿已删除')
   }
 
   const nameSuggestions = corpusName.trim().length > 1 ? corpusRecords.filter((item) => item.title.includes(corpusName.trim()) && item.title !== corpusName).slice(0, 5) : []
@@ -179,6 +287,7 @@ export default function CorpusUpload() {
 
   const submitBasic = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!taskName.trim()) return notify('请填写任务名称')
     if (!selectedSubjects.length) return notify('请选择至少一个学科领域')
     if (!corpusType) return notify('请选择语料类型')
     setStep(2)
@@ -202,7 +311,12 @@ export default function CorpusUpload() {
   }
 
   const submitReview = () => {
-    saveDraft()
+    if (user && draftId) {
+      const next = loadDraftList(user.account).filter((item) => item.id !== draftId)
+      persistDraftList(user.account, next)
+      setDraftList(next)
+      setDraftId(null)
+    }
     setStep(4)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -210,7 +324,7 @@ export default function CorpusUpload() {
   if (!user) {
     return (
       <main className="corpus-upload-page upload-access-page">
-        <div className="upload-access-card"><ShieldCheck size={42} /><h1>上传语料库</h1><h2>请先登录平台</h2><p>登录后可上传语料库，以保障语料权属清晰、操作可追溯。</p><button type="button" onClick={() => openAuth('/upload')}>登录平台</button></div>
+        <div className="upload-access-card"><ShieldCheck size={42} /><h1>上传语料库</h1><h2>请先登录平台</h2><p>登录后可上传语料库，以保障语料权属清晰、操作可追溯。</p><button type="button" onClick={() => openAuth('/upload/form')}>登录平台</button></div>
       </main>
     )
   }
@@ -218,7 +332,10 @@ export default function CorpusUpload() {
   return (
     <main className="corpus-upload-page">
       <div className="corpus-upload-shell">
-        <div className="upload-page-heading"><div><span>{editRecord ? '编辑已有语料库' : '规范化语料汇交'}</span><h1>上传语料库</h1></div><p>请按照步骤完善语料库信息并提交审核</p></div>
+        <div className="upload-page-heading">
+          <div><span>{editRecord ? '编辑已有语料库' : '规范化语料汇交'}</span><h1>上传语料库</h1><p>请按照步骤完善语料库信息并提交审核</p></div>
+          <button className="upload-drafts-btn" type="button" onClick={() => setDraftsOpen(true)}><FolderArchive size={16} />草稿箱（{draftList.length}）</button>
+        </div>
         <div className="upload-workspace">
           <aside className="upload-stepper">
             {[['基本信息', '填写作者与语料库信息'], ['上传语料库', '设置开放范围并上传文件'], ['确认信息', '核对全部提交内容'], ['上传成功', '查看审核和上传结果']].map(([title, description], index) => <div key={title} className={`${step === index + 1 ? 'is-active ' : ''}${step > index + 1 ? 'is-complete' : ''}`}><i>{step > index + 1 ? <Check size={15} /> : index + 1}</i><span><strong>{title}</strong><small>{description}</small></span></div>)}
@@ -228,6 +345,10 @@ export default function CorpusUpload() {
             {step === 1 && (
               <form onSubmit={submitBasic}>
                 <header className="upload-form-title"><div><span>第一步</span><h2>基本信息</h2></div><p>带 * 的项目为必填或必选项</p></header>
+                <section className="upload-form-section">
+                  <div className="upload-section-title"><div><ClipboardList size={18} /><h3>任务名称</h3></div><p>任务名称用于在草稿箱和汇交记录中标识本次汇交任务，请使用清晰易识别的名称。</p></div>
+                  <label className="upload-task-name"><span>任务名称 *</span><input required value={taskName} onChange={(event) => setTaskName(event.target.value)} placeholder="如：天然产物结构语料汇交（2026-09）" /></label>
+                </section>
                 <section className="upload-form-section">
                   <div className="upload-section-title"><div><UserRound size={18} /><h3>作者信息</h3></div><p>请明确提供可用于联络作者的联系方式，以便有任何疑惑可联络解决。</p></div>
                   <div className="author-list">{authors.map((author, index) => <div className="author-row" key={index}><label><span>姓名 *</span><input required value={author.name} onChange={(event) => updateAuthor(index, 'name', event.target.value)} placeholder="作者姓名" /></label><label><span>联系方式（邮箱/手机号）*</span><input required value={author.contact} onChange={(event) => updateAuthor(index, 'contact', event.target.value)} placeholder="邮箱或手机号" /></label><label><span>所在单位 *</span><input required value={author.organization} onChange={(event) => updateAuthor(index, 'organization', event.target.value)} placeholder="作者所在单位" /></label>{authors.length > 1 && <button type="button" aria-label="删除作者" onClick={() => setAuthors((current) => current.filter((_, position) => position !== index))}><Trash2 size={17} /></button>}{index === authors.length - 1 && <button type="button" className="add-author" aria-label="添加作者" onClick={() => setAuthors((current) => [...current, emptyAuthor()])}><Plus size={18} /></button>}</div>)}</div>
@@ -264,7 +385,7 @@ export default function CorpusUpload() {
                     <label><span>供给方式 *</span><select required value={supplyMode} onChange={(event) => setSupplyMode(event.target.value)}><option value="">请选择</option><option>开源</option><option>闭源</option><option>定向</option></select></label>
                   </div>
                 </section>
-                <div className="upload-form-actions"><button type="button" onClick={saveDraft}><Save size={16} />保存</button><button type="submit" className="is-primary">下一步<ChevronRight size={16} /></button></div>
+                <div className="upload-form-actions"><button type="button" onClick={() => saveDraft()}><Save size={16} />保存</button><button type="submit" className="is-primary">下一步<ChevronRight size={16} /></button></div>
               </form>
             )}
 
@@ -278,7 +399,7 @@ export default function CorpusUpload() {
                   {openness === '部分公开' && <UploadGroup title="公开部分数据" required description="上传允许公众直接浏览或下载的那部分数据" state={uploads.public} onChange={(value) => updateUpload('public', value)} />}
                   <UploadGroup title="全部数据" required description="上传语料库完整数据，实际下载范围将依据用户权限和开放程度控制" state={uploads.all} onChange={(value) => updateUpload('all', value)} />
                 </section>
-                <div className="upload-form-actions"><button type="button" onClick={saveDraft}><Save size={16} />保存</button><button type="button" onClick={() => setStep(1)}>上一步</button><button type="submit" className="is-primary">下一步<ChevronRight size={16} /></button></div>
+                <div className="upload-form-actions"><button type="button" onClick={() => saveDraft()}><Save size={16} />保存</button><button type="button" onClick={() => setStep(1)}>上一步</button><button type="submit" className="is-primary">下一步<ChevronRight size={16} /></button></div>
               </form>
             )}
 
@@ -288,7 +409,7 @@ export default function CorpusUpload() {
                 <section className="upload-confirm-section"><h3>作者信息</h3>{authors.map((author, index) => <div className="confirm-author" key={index}><strong>{author.name}</strong><span>{author.contact}</span><span>{author.organization}</span></div>)}</section>
                 <section className="upload-confirm-section"><h3>语料库信息</h3><dl><div><dt>语料库名称</dt><dd>{corpusName}</dd></div><div><dt>语料库关键词</dt><dd>{keywords.join('、')}</dd></div><div className="is-wide"><dt>语料库介绍</dt><dd>{introduction}</dd></div><div className="is-wide"><dt>主要数据来源</dt><dd>{dataSource}</dd></div><div><dt>学科领域</dt><dd>{selectedSubjects.join('、')}</dd></div><div><dt>语料类型</dt><dd>{corpusType}</dd></div><div><dt>发布机构</dt><dd>{[effectiveOrganization, effectiveDepartment].filter(Boolean).join(' - ')}</dd></div><div><dt>所在省份</dt><dd>{province}</dd></div><div><dt>语料规模</dt><dd>{corpusSize}</dd></div><div><dt>存储容量</dt><dd>{storageSize}</dd></div><div><dt>对外供给</dt><dd>{supplyStatus}</dd></div><div><dt>供给方式</dt><dd>{supplyMode}</dd></div></dl></section>
                 <section className="upload-confirm-section"><h3>文件与开放信息</h3><dl><div><dt>许可协议</dt><dd>{license}</dd></div><div><dt>开放程度</dt><dd>{openness}</dd></div><div><dt>示例数据</dt><dd>{groupLabel(uploads.sample)}</dd></div>{openness === '部分公开' && <div><dt>公开部分数据</dt><dd>{groupLabel(uploads.public)}</dd></div>}<div><dt>全部数据</dt><dd>{groupLabel(uploads.all)}</dd></div></dl></section>
-                <div className="upload-form-actions"><button type="button" onClick={saveDraft}><Save size={16} />保存</button><button type="button" onClick={() => setStep(2)}>上一步</button><button type="button" className="is-primary" onClick={submitReview}>提交审核</button></div>
+                <div className="upload-form-actions"><button type="button" onClick={() => saveDraft()}><Save size={16} />保存</button><button type="button" onClick={() => setStep(2)}>上一步</button><button type="button" className="is-primary" onClick={submitReview}>提交审核</button></div>
               </div>
             )}
 
@@ -296,6 +417,30 @@ export default function CorpusUpload() {
           </section>
         </div>
       </div>
+      {draftsOpen && (
+        <div className="dataset-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setDraftsOpen(false) }}>
+          <section className="dataset-modal upload-drafts-modal" role="dialog" aria-modal="true">
+            <div className="dataset-modal-title"><div><FolderArchive size={21} /><h2>草稿箱</h2></div><button type="button" onClick={() => setDraftsOpen(false)} aria-label="关闭"><X size={18} /></button></div>
+            {draftList.length > 0 ? (
+              <div className="upload-draft-list">
+                {draftList.map((record) => (
+                  <article className="upload-draft-card" key={record.id}>
+                    <div className="upload-draft-copy">
+                      <h3>{record.data.taskName?.trim() || record.data.corpusName?.trim() || '未命名语料草稿'}</h3>
+                      <p>保存于 {record.savedAt} · 第 {Math.min(Math.max(record.step, 1), 3)} 步</p>
+                    </div>
+                    <div className="upload-draft-actions">
+                      <button type="button" className="is-primary" onClick={() => applyDraft(record)}>继续填写</button>
+                      <button type="button" onClick={() => removeDraft(record.id)}><Trash2 size={15} />删除</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : <p className="upload-draft-empty">暂无草稿</p>}
+          </section>
+        </div>
+      )}
+
       {toast && <div className="upload-toast"><Check size={16} />{toast}</div>}
     </main>
   )

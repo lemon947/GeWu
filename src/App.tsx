@@ -10,6 +10,7 @@ import DatasetEdit from './pages/DatasetEdit'
 import DatasetAudit from './pages/DatasetAudit'
 import DatasetAuditReview from './pages/DatasetAuditReview'
 import CorpusUpload from './pages/CorpusUpload'
+import CorpusUploadLanding from './pages/CorpusUploadLanding'
 import Profile from './pages/Profile'
 import DemandSquare from './pages/DemandSquare'
 import DemandDetail from './pages/DemandDetail'
@@ -30,7 +31,8 @@ export default function App() {
         <Route path="/search/datasets/:id/edit" element={<ProtectedRoute><DatasetEdit /></ProtectedRoute>} />
         <Route path="/search/datasets/:id/audit" element={<ProtectedRoute><DatasetAudit /></ProtectedRoute>} />
         <Route path="/profile/audit/:id" element={<ProtectedRoute><DatasetAuditReview /></ProtectedRoute>} />
-        <Route path="/upload" element={<CorpusUpload />} />
+        <Route path="/upload" element={<CorpusUploadLanding />} />
+        <Route path="/upload/form" element={<CorpusUpload />} />
         <Route path="/demands" element={<DemandSquare />} />
         <Route path="/demands/new" element={<DemandCreate />} />
         <Route path="/demands/new/edit" element={<DemandPostEditor />} />
