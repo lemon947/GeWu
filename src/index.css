@@ -21795,3 +21795,49 @@ body {
   display: grid;
   gap: 8px;
 }
+
+/* Upload form sections — icon & example aside in purple theme */
+.corpus-upload-page .upload-section-title > div {
+  color: #6a5cff;
+}
+
+.corpus-upload-page .upload-section-title h3 {
+  color: #1c2340;
+}
+
+.corpus-upload-page .upload-form-section {
+  border-bottom-color: #eef1fb;
+}
+
+.corpus-upload-page .author-row > button.add-author {
+  color: #5a54f0;
+  background: #f2f3ff;
+  border-color: #d9dcff;
+}
+
+.corpus-upload-page .corpus-name-suggestions {
+  border-color: #dfe3f8;
+  box-shadow: 0 12px 26px rgba(90, 84, 240, .12);
+}
+
+.corpus-upload-page .corpus-name-suggestions button {
+  color: #3f4a80;
+}
+
+.corpus-upload-page .corpus-name-suggestions button:hover {
+  background: #f2f3ff;
+}
+
+.corpus-upload-page .example-field-row aside {
+  color: #64708c;
+  background: #f7f8ff;
+  border-color: #e3e6fb;
+}
+
+.corpus-upload-page .example-field-row aside strong {
+  color: #4b46d6;
+}
+
+.corpus-upload-page .example-field-row aside small {
+  color: #9298b4;
+}

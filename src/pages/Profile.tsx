@@ -28,7 +28,8 @@ type DemandTab = 'published' | 'favorited' | 'commented'
 type SocialTab = '关注' | '粉丝'
 type NoticeTab = 'audit' | 'comment'
 type ModalType = 'avatar' | 'basic' | null
-type SimplePrivacy = '公开' | '不公开'
+type FavoritePrivacy = '全部公开' | '仅公开我收藏的语料库' | '仅公开我收藏的需求' | '全部私密'
+type CommentPrivacy = '全部公开' | '仅公开我评论的语料库' | '仅公开我评论的需求' | '全部私密'
 type FollowPrivacy = '全部公开' | '仅公开关注列表' | '仅公开粉丝列表' | '全部私密'
 
 type UserProfile = {
@@ -115,7 +116,7 @@ const commentNotices: CommentNotice[] = [
   { id: 4, user: '李思远', text: '请问可以扩展语音方言类的共建需求吗？', time: '2026-08-30', kind: 'demand', targetId: 'demand-geo-001' },
 ]
 
-type SubmitStatus = '审核中' | '待修改' | '已通过' | '未通过' | '发布异常' | '已发布' | '已撤回' | '已上传'
+type SubmitStatus = '审核中' | '待修改' | '已通过' | '未通过' | '发布异常' | '已撤回' | '已上传'
 type SubmitRecord = {
   id: number
   corpusName: string
@@ -127,7 +128,7 @@ type SubmitRecord = {
   opinion?: string
 }
 
-const submitStatusOptions: SubmitStatus[] = ['审核中', '待修改', '已通过', '未通过', '发布异常', '已发布', '已撤回']
+const submitStatusOptions: SubmitStatus[] = ['审核中', '待修改', '已通过', '未通过', '发布异常', '已撤回']
 
 const submitRecords: SubmitRecord[] = [
   { id: 1, corpusName: '数学教育教学语料库', type: '新建语料库', submittedAt: '2026-09-07 10:25', status: '审核中', corpusId: 'math-01' },
@@ -135,7 +136,6 @@ const submitRecords: SubmitRecord[] = [
   { id: 3, corpusName: '天文观测语料库', type: '新建语料库', submittedAt: '2026-09-05 09:32', status: '已通过', corpusId: 'astro-04' },
   { id: 4, corpusName: '环境化学语料库', type: '新建语料库', submittedAt: '2026-09-03 11:05', status: '未通过', corpusId: 'chem-04', reason: '数据样例不足，请补充字段口径说明后重新提交' },
   { id: 5, corpusName: '极端天气事件语料库', type: '新建语料库', submittedAt: '2026-09-02 17:20', status: '发布异常', corpusId: 'geo-03', reason: '系统发布服务超时，自动发布失败，请稍后重试' },
-  { id: 6, corpusName: '生物机理分析语料库', type: '新建语料库', submittedAt: '2026-08-31 14:10', status: '已发布', corpusId: 'bio-04' },
   { id: 7, corpusName: '量子力学问题语料库', type: '新建语料库', submittedAt: '2026-08-29 10:12', status: '已撤回', corpusId: 'physics-01' },
   { id: 9, corpusName: '光学实验视频语料库', type: '上传语料', submittedAt: '2026-09-06 16:20', status: '审核中', corpusId: 'physics-04' },
   { id: 10, corpusName: '星系光谱语料库', type: '上传语料', submittedAt: '2026-08-30 11:47', status: '已通过', corpusId: 'astro-02' },
@@ -144,7 +144,8 @@ const submitRecords: SubmitRecord[] = [
 ]
 
 
-const simplePrivacyOptions: SimplePrivacy[] = ['公开', '不公开']
+const favoritePrivacyOptions: FavoritePrivacy[] = ['全部公开', '仅公开我收藏的语料库', '仅公开我收藏的需求', '全部私密']
+const commentPrivacyOptions: CommentPrivacy[] = ['全部公开', '仅公开我评论的语料库', '仅公开我评论的需求', '全部私密']
 const followPrivacyOptions: FollowPrivacy[] = ['全部公开', '仅公开关注列表', '仅公开粉丝列表', '全部私密']
 
 const demandPageSize = 6
@@ -229,11 +230,11 @@ export default function Profile() {
   const [corpusPage, setCorpusPage] = useState(1)
   const [demandPage, setDemandPage] = useState(1)
   const [userFollowed, setUserFollowed] = useState<Record<string, boolean>>(() => Object.fromEntries(communityUsers.map((u) => [u.id, u.following])))
-  const [privacyFavorite, setPrivacyFavorite] = useState<SimplePrivacy>('公开')
-  const [privacyCommented, setPrivacyCommented] = useState<SimplePrivacy>('公开')
+  const [privacyFavorite, setPrivacyFavorite] = useState<FavoritePrivacy>('全部公开')
+  const [privacyCommented, setPrivacyCommented] = useState<CommentPrivacy>('全部公开')
   const [privacyFollow, setPrivacyFollow] = useState<FollowPrivacy>('全部公开')
   const submitStatusParam = searchParams.get('sstatus')
-  const submitStatus: '全部' | SubmitStatus = (['审核中', '待修改', '已通过', '未通过', '发布异常', '已发布', '已撤回'] as SubmitStatus[]).includes(submitStatusParam as SubmitStatus) ? submitStatusParam as SubmitStatus : '全部'
+  const submitStatus: '全部' | SubmitStatus = (['审核中', '待修改', '已通过', '未通过', '发布异常', '已撤回'] as SubmitStatus[]).includes(submitStatusParam as SubmitStatus) ? submitStatusParam as SubmitStatus : '全部'
   const setSubmitStatus = (status: '全部' | SubmitStatus) => {
     updateParams({ sstatus: status === '全部' ? null : status })
     setSubmitPage(1)
@@ -702,8 +703,6 @@ export default function Profile() {
                                   </>
                                 ) : record.status === '发布异常' ? (
                                   <button type="button" onClick={() => setReasonModal({ title: '发布异常原因', reason: record.reason ?? '' })}>查看原因</button>
-                                ) : record.status === '已发布' ? (
-                                  <button type="button" onClick={() => navigate(`/search/datasets/${record.corpusId}`)}>查看语料库</button>
                                 ) : (
                                   <>
                                     <button type="button" onClick={() => navigate(`/search/datasets/${record.corpusId}`)}>预览内容</button>
@@ -821,14 +820,14 @@ export default function Profile() {
               <p className="profile-privacy-intro">设置个人主页对外展示内容的可见范围</p>
               <label className="profile-privacy-row">
                 <span>我收藏的</span>
-                <select value={privacyFavorite} onChange={(event) => setPrivacyFavorite(event.target.value as SimplePrivacy)}>
-                  {simplePrivacyOptions.map((option) => <option key={option}>{option}</option>)}
+                <select value={privacyFavorite} onChange={(event) => setPrivacyFavorite(event.target.value as FavoritePrivacy)}>
+                  {favoritePrivacyOptions.map((option) => <option key={option}>{option}</option>)}
                 </select>
               </label>
               <label className="profile-privacy-row">
                 <span>我评论的</span>
-                <select value={privacyCommented} onChange={(event) => setPrivacyCommented(event.target.value as SimplePrivacy)}>
-                  {simplePrivacyOptions.map((option) => <option key={option}>{option}</option>)}
+                <select value={privacyCommented} onChange={(event) => setPrivacyCommented(event.target.value as CommentPrivacy)}>
+                  {commentPrivacyOptions.map((option) => <option key={option}>{option}</option>)}
                 </select>
               </label>
               <label className="profile-privacy-row">
