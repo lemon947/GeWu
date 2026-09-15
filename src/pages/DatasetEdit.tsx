@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { ArrowLeft, ArrowUpFromLine, Check, Copy, FileArchive, FileText, FolderUp, Github, Link2, Plus, Trash2, X } from 'lucide-react'
 import { corpusRecords, recordDisplayMeta } from './CorpusSearch'
@@ -110,7 +110,6 @@ export default function DatasetEdit() {
   const meta = recordDisplayMeta(item)
   const [authors, setAuthors] = useState<Author[]>([{ name: '张伟', contact: '', organization: item.authors }])
   const [subject, setSubject] = useState(item.subject)
-  const [subjectChild, setSubjectChild] = useState(subjectChildren[item.subject]?.[0] ?? '')
   const [corpusName, setCorpusName] = useState(item.title)
   const [introduction, setIntroduction] = useState(item.summary)
   const [keywordInput, setKeywordInput] = useState('')
@@ -118,10 +117,11 @@ export default function DatasetEdit() {
   const [dataSource, setDataSource] = useState('高校专业教材、科研文献、课程资源及经专家校验的领域数据')
   const [corpusType, setCorpusType] = useState(item.corpusType.includes('后训练') ? '后训练' : item.corpusType.includes('RAG') || item.corpusType.includes('检索') ? 'RAG' : item.corpusType.includes('微调') ? '微调' : '预训练')
   const [orgType, setOrgType] = useState(item.organization.includes('大学') ? '高校' : item.organization.includes('研究院') ? '新型研发机构' : '企业')
-  const [organization, setOrganization] = useState(item.organization)
-  const [department, setDepartment] = useState(item.organization === '北京大学' ? item.authors.replace('北京大学', '') : '')
+  const [organization, setOrganization] = useState(() => {
+    const nested = `${item.organization}·${item.authors}`
+    return item.organization === '北京大学' && item.authors.startsWith('北京大学') ? nested : item.organization
+  })
   const [customOrganization, setCustomOrganization] = useState('')
-  const [customDepartment, setCustomDepartment] = useState('')
   const [province, setProvince] = useState('')
   const [corpusSize, setCorpusSize] = useState(meta.corpusSize)
   const [corpusSizeDetail, setCorpusSizeDetail] = useState('')
@@ -168,6 +168,10 @@ export default function DatasetEdit() {
       flashToast('请完善必填信息')
       return
     }
+    if (keywords.length === 0) {
+      flashToast('请至少添加一个语料库关键词')
+      return
+    }
     setShowSaved(true)
   }
 
@@ -212,7 +216,7 @@ export default function DatasetEdit() {
           <label className="dataset-edit-field is-wide"><span>语料库名称 *</span><input value={corpusName} onChange={(event) => setCorpusName(event.target.value)} placeholder="请填写语料库的名称" /></label>
         </div>
         <label className="dataset-edit-field"><span>语料库摘要 *</span><textarea rows={4} value={introduction} onChange={(event) => setIntroduction(event.target.value)} placeholder="请给出语料库的简要介绍" /></label>
-        <label className="dataset-edit-field"><span>语料库关键词</span>
+        <label className="dataset-edit-field"><span>语料库关键词 *</span>
           <div className="keyword-box">
             <input value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addKeyword() } }} placeholder="输入后按回车添加，最多 10 个关键词" />
             {keywords.length > 0 && <div className="keyword-chips">{keywords.map((keyword) => <span key={keyword}>{keyword}<button type="button" aria-label={`删除关键词 ${keyword}`} onClick={() => setKeywords((current) => current.filter((item) => item !== keyword))}><X size={11} /></button></span>)}</div>}
@@ -221,10 +225,16 @@ export default function DatasetEdit() {
         <label className="dataset-edit-field"><span>语料库主要数据来源 *</span><textarea rows={3} value={dataSource} onChange={(event) => setDataSource(event.target.value)} placeholder="请说明语料库的主要数据来源" /></label>
 
         <div className="dataset-edit-grid">
-          <label className="dataset-edit-field"><span>学科领域 *</span><select value={subject} onChange={(event) => { setSubject(event.target.value); setSubjectChild(subjectChildren[event.target.value]?.[0] ?? '') }}>{subjects.map((item) => <option key={item}>{item}</option>)}</select></label>
-          {subjectChildren[subject] && (
-            <label className="dataset-edit-field"><span>细分方向</span><select value={subjectChild} onChange={(event) => setSubjectChild(event.target.value)}>{subjectChildren[subject].map((child) => <option key={child}>{child}</option>)}</select></label>
-          )}
+          <label className="dataset-edit-field"><span>学科领域 *</span>
+            <select value={subject} onChange={(event) => setSubject(event.target.value)}>
+              {subjects.map((name) => (
+                <Fragment key={name}>
+                  <option value={name}>{name}</option>
+                  {(subjectChildren[name] ?? []).map((child) => <option value={`${name}·${child}`} key={child}>{`　　${child}`}</option>)}
+                </Fragment>
+              ))}
+            </select>
+          </label>
           <label className="dataset-edit-field"><span>语料类型 *</span><select value={corpusType} onChange={(event) => setCorpusType(event.target.value)}>{['预训练', '后训练', 'RAG', '微调'].map((item) => <option key={item}>{item}</option>)}</select></label>
           <label className="dataset-edit-field"><span>语种类别 *</span><select value={language} onChange={(event) => setLanguage(event.target.value)}><option>中文/英文</option><option>中文</option><option>英文</option></select></label>
           <label className="dataset-edit-field"><span>语料格式 *</span><input value={format} onChange={(event) => setFormat(event.target.value)} placeholder="如 CSV / JSON / SQL" /></label>
@@ -232,13 +242,22 @@ export default function DatasetEdit() {
         </div>
 
         <div className="dataset-edit-grid">
-          <label className="dataset-edit-field"><span>发布机构类型 *</span><select value={orgType} onChange={(event) => { setOrgType(event.target.value); setOrganization(''); setDepartment('') }}><option>高校</option><option>企业</option><option>新型研发机构</option><option>个人</option></select></label>
+          <label className="dataset-edit-field"><span>发布机构类型 *</span><select value={orgType} onChange={(event) => { setOrgType(event.target.value); setOrganization('') }}><option>高校</option><option>企业</option><option>新型研发机构</option><option>个人</option></select></label>
           {orgType && orgType !== '个人' ? (
-            <label className="dataset-edit-field"><span>发布机构 *</span><select value={organization} onChange={(event) => { setOrganization(event.target.value); setDepartment('') }}><option value="">请选择</option>{(orgType === '高校' ? universities : orgType === '企业' ? ['深势科技', '其他'] : ['北京科学智能研究院', '其他']).map((item) => <option key={item}>{item}</option>)}</select></label>
+            <label className="dataset-edit-field"><span>发布机构 *</span>
+              <select value={organization} onChange={(event) => setOrganization(event.target.value)}>
+                <option value="">请选择</option>
+                {orgType === '高校' ? (
+                  <>
+                    <option value="北京大学">北京大学</option>
+                    {pkuDepartments.filter((label) => label !== '其他').map((label) => <option value={`北京大学·${label}`} key={label}>{`　　${label}`}</option>)}
+                    {universities.filter((name) => name !== '北京大学').map((name) => <option key={name}>{name}</option>)}
+                  </>
+                ) : (orgType === '企业' ? ['深势科技', '其他'] : ['北京科学智能研究院', '其他']).map((name) => <option key={name}>{name}</option>)}
+              </select>
+            </label>
           ) : <div />}
-          {orgType === '高校' && organization === '北京大学' && <label className="dataset-edit-field"><span>院系单位 *</span><select value={department} onChange={(event) => setDepartment(event.target.value)}><option value="">请选择</option>{pkuDepartments.map((item) => <option key={item}>{item}</option>)}</select></label>}
           {organization === '其他' && <label className="dataset-edit-field"><span>其他机构名称 *</span><input value={customOrganization} onChange={(event) => setCustomOrganization(event.target.value)} placeholder="请输入机构名称" /></label>}
-          {department === '其他' && <label className="dataset-edit-field"><span>其他院系名称 *</span><input value={customDepartment} onChange={(event) => setCustomDepartment(event.target.value)} placeholder="请输入院系名称" /></label>}
           <label className="dataset-edit-field"><span>发布机构所在省份 *</span><select value={province} onChange={(event) => setProvince(event.target.value)}><option value="">请选择省份</option>{provinces.map((item) => <option key={item}>{item}</option>)}</select></label>
           <div className="dataset-edit-cell">
             <label className="dataset-edit-field"><span>语料规模 *</span><select value={corpusSize} onChange={(event) => setCorpusSize(event.target.value)}><option value="">请选择</option>{['1千以下', '1千-1万', '1万-10万', '10万-100万', '100万以上'].map((item) => <option key={item}>{item}</option>)}</select></label>

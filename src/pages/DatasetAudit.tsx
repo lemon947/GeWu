@@ -179,7 +179,7 @@ export default function DatasetAudit() {
             {subTab === '待审批' && (
               <div className="audit-filter-row">
                 <label className={fieldClass}>ID<input className={inputClass} value={filterId} onChange={(event) => setFilterId(event.target.value)} placeholder="请输入ID" /></label>
-                <label className={fieldClass}>类型<select className={selectClass} value={filterType} onChange={(event) => setFilterType(event.target.value)}><option value="">请选择</option>{taskTypeOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label className={fieldClass}>类型<select className={selectClass} value={filterType} onChange={(event) => setFilterType(event.target.value)}><option value="">全部</option>{taskTypeOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
                 <label className={fieldClass}>申请时间<span className="audit-date-range"><input type="date" value={filterAppliedFrom} onChange={(event) => setFilterAppliedFrom(event.target.value)} /><i>→</i><input type="date" value={filterAppliedTo} onChange={(event) => setFilterAppliedTo(event.target.value)} /></span></label>
                 <button className="audit-reset" type="button" disabled={pendingFilteredCount === 0} onClick={resetPendingFilters}>重置</button>
               </div>
@@ -188,8 +188,8 @@ export default function DatasetAudit() {
             {subTab === '已办结' && (
               <div className="audit-filter-row">
                 <label className={fieldClass}>ID<input className={inputClass} value={filterId} onChange={(event) => setFilterId(event.target.value)} placeholder="请输入ID" /></label>
-                <label className={fieldClass}>类型<select className={selectClass} value={filterType} onChange={(event) => setFilterType(event.target.value)}><option value="">请选择</option>{taskTypeOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
-                <label className={fieldClass}>状态<select className={selectClass} value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}><option value="">请选择</option><option>已通过</option><option>已拒绝</option></select></label>
+                <label className={fieldClass}>类型<select className={selectClass} value={filterType} onChange={(event) => setFilterType(event.target.value)}><option value="">全部</option>{taskTypeOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label className={fieldClass}>状态<select className={selectClass} value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}><option value="">全部</option><option>已通过</option><option>已拒绝</option></select></label>
                 <label className={fieldClass}>审批人<input className={inputClass} value={filterApprover} onChange={(event) => setFilterApprover(event.target.value)} placeholder="搜索审批人" /></label>
                 <label className={fieldClass}>申请时间<span className="audit-date-range"><input type="date" value={filterAppliedFrom} onChange={(event) => setFilterAppliedFrom(event.target.value)} /><i>→</i><input type="date" value={filterAppliedTo} onChange={(event) => setFilterAppliedTo(event.target.value)} /></span></label>
                 <label className={fieldClass}>审批时间<span className="audit-date-range"><input type="date" value={filterApprovedFrom} onChange={(event) => setFilterApprovedFrom(event.target.value)} /><i>→</i><input type="date" value={filterApprovedTo} onChange={(event) => setFilterApprovedTo(event.target.value)} /></span></label>
@@ -239,7 +239,7 @@ export default function DatasetAudit() {
             <div className="audit-filter-row">
               <label className={fieldClass}>操作人<input className={inputClass} value={filterOperator} onChange={(event) => setFilterOperator(event.target.value)} placeholder="搜索操作人" /></label>
               <label className={fieldClass}>操作时间<span className="audit-date-range"><input type="date" /><i>→</i><input type="date" /></span></label>
-              <label className={fieldClass}>操作类型<select className={selectClass} value={filterOpType} onChange={(event) => setFilterOpType(event.target.value)}><option value="">请选择</option>{logTypeOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
+              <label className={fieldClass}>操作类型<select className={selectClass} value={filterOpType} onChange={(event) => setFilterOpType(event.target.value)}><option value="">全部</option>{logTypeOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
               <button className="audit-reset" type="button" disabled={logFilterCount === 0} onClick={() => { setFilterOperator(''); setFilterOpType('') }}>重置</button>
               <button className="audit-export" type="button" onClick={() => flashToast('操作日志已导出')}>导出日志</button>
             </div>
