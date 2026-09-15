@@ -21841,3 +21841,195 @@ body {
 .corpus-upload-page .example-field-row aside small {
   color: #9298b4;
 }
+
+/* Size / storage — select + detail input side by side */
+.upload-size-cell {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.upload-size-cell > span {
+  color: #526d78;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.upload-size-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.upload-size-controls select,
+.upload-size-controls input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.dataset-edit-cell {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dataset-edit-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.dataset-edit-controls select,
+.dataset-edit-controls input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Upload drop zone — purple reference design */
+.corpus-upload-page .upload-file-drop {
+  min-height: 300px;
+  padding: 34px 26px;
+  display: grid;
+  place-items: center;
+  justify-items: center;
+  align-content: center;
+  gap: 14px;
+  background: linear-gradient(165deg, #f8f8ff, #eef0ff);
+  border: 1.5px dashed #c9c9f5;
+  border-radius: 16px;
+}
+
+.corpus-upload-page .upload-file-drop > svg {
+  width: 68px;
+  height: 68px;
+  padding: 17px;
+  color: #8f8be8;
+  background: linear-gradient(145deg, #eef0ff, #dde0ff);
+  border: 1px solid #d5d7ff;
+  border-radius: 18px;
+}
+
+.corpus-upload-page .upload-file-drop > div:nth-of-type(1) {
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.corpus-upload-page .upload-file-drop strong {
+  color: #1c2340;
+  font-size: 17px;
+}
+
+.corpus-upload-page .upload-file-drop span {
+  color: #75899b;
+  font-size: 13px;
+}
+
+.corpus-upload-page .upload-file-drop > div:last-of-type {
+  margin-top: 4px;
+  display: flex;
+  justify-self: center;
+  gap: 12px;
+}
+
+.corpus-upload-page .upload-file-drop label {
+  min-height: 44px;
+  padding: 0 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.corpus-upload-page .upload-file-drop label:first-child {
+  color: #fff;
+  background: linear-gradient(135deg, #6a5cff, #5a54f0);
+  border: 0;
+  box-shadow: 0 10px 22px rgba(106, 92, 255, .26);
+}
+
+.corpus-upload-page .upload-file-drop label:last-child {
+  color: #4b46d6;
+  background: #fff;
+  border: 1px solid #d9dcff;
+}
+
+/* Upload page — drop zone strictly per reference design */
+.corpus-upload-page .upload-source-tabs {
+  padding: 5px;
+  gap: 4px;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 8px 20px rgba(37, 52, 110, .08);
+}
+
+.corpus-upload-page .upload-source-tabs button {
+  min-height: 34px;
+  padding: 0 18px;
+  color: #4a5568;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.corpus-upload-page .upload-source-tabs button.is-active {
+  color: #fff;
+  background: #23262e;
+  box-shadow: none;
+}
+
+.corpus-upload-page .upload-file-drop {
+  min-height: 320px;
+  padding: 36px 26px;
+  gap: 14px;
+  background: linear-gradient(180deg, #f5f6fe, #eef0fb);
+  border: 0;
+  border-radius: 14px;
+}
+
+.corpus-upload-page .upload-drop-icon {
+  width: auto;
+  height: auto;
+  color: #b9bcf4;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.corpus-upload-page .upload-drop-icon svg {
+  width: 62px;
+  height: 62px;
+  color: #b9bcf4;
+}
+
+.corpus-upload-page .upload-drop-copy strong {
+  color: #1c2340;
+  font-size: 17px;
+  font-weight: 850;
+}
+
+.corpus-upload-page .upload-drop-copy span {
+  color: #7b8fa3;
+  font-size: 14px;
+}
+
+.corpus-upload-page .upload-browse-btn {
+  min-height: 44px;
+  padding: 0 30px;
+  color: #fff;
+  background: linear-gradient(135deg, #5b6cfa, #3d4fe8);
+  border: 0;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(67, 84, 230, .28);
+}
+
+.corpus-upload-page .upload-browse-btn.is-ghost {
+  color: #3f4756;
+  background: #fff;
+  border: 1px solid #dfe2ee;
+  box-shadow: none;
+}

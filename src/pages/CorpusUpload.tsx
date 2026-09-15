@@ -5,10 +5,10 @@ import {
   ChevronRight,
   ClipboardList,
   Copy,
-  FileArchive,
   FileText,
   FolderArchive,
   Github,
+  ImageUp,
   Link2,
   Plus,
   Save,
@@ -96,15 +96,15 @@ function UploadGroup({ title, required, description, state, onChange }: { title:
   const updateFiles = (files: FileList | null) => onChange({ ...state, files: files ? Array.from(files).map((file) => file.name) : [] })
   return (
     <section className="upload-file-group">
-      <div className="upload-file-group-head"><div><h3>{title}{required && <b> *</b>}</h3><p>{description}</p></div><div className="upload-source-tabs"><button type="button" className={state.mode === 'local' ? 'is-active' : ''} onClick={() => onChange({ ...state, mode: 'local' })}>本地文件</button><button type="button" className={state.mode === 'link' ? 'is-active' : ''} onClick={() => onChange({ ...state, mode: 'link' })}>链接</button><button type="button" className={state.mode === 'cli' ? 'is-active' : ''} onClick={() => onChange({ ...state, mode: 'cli' })}>命令行</button></div></div>
+      <div className="upload-file-group-head"><div><h3>{title}{required && <b> *</b>}</h3><p>{description}</p></div><div className="upload-source-tabs"><button type="button" className={state.mode === 'local' ? 'is-active' : ''} onClick={() => onChange({ ...state, mode: 'local' })}>本地上传</button><button type="button" className={state.mode === 'link' ? 'is-active' : ''} onClick={() => onChange({ ...state, mode: 'link' })}>外部链接导入</button><button type="button" className={state.mode === 'cli' ? 'is-active' : ''} onClick={() => onChange({ ...state, mode: 'cli' })}>命令行上传</button></div></div>
       {state.mode === 'local' && (
         <div className="upload-file-drop upload-drop-v2" onDragOver={() => false} onDrop={(event) => { event.preventDefault(); updateFiles(event.dataTransfer.files) }}>
-          <span className="upload-drop-icon"><FileArchive size={30} /></span>
+          <span className="upload-drop-icon"><ImageUp size={54} /></span>
           <div className="upload-drop-copy">
-            <strong>{state.files.length ? `已选择 ${state.files.length} 个文件` : '拖拽文件到此处上传'}</strong>
-            <span>{state.files.length ? state.files.slice(0, 3).join('、') : '支持单个文件、多个文件或整个文件夹'}</span>
+            <strong>{state.files.length ? `已选择 ${state.files.length} 个文件` : '选择需要上传的语料文件'}</strong>
+            <span>{state.files.length ? state.files.slice(0, 3).join('、') : '单次上传数据大小不超过 2GB，上传后将发送给管理员审核'}</span>
             <div>
-              <label className="upload-browse-btn" htmlFor={`${inputKey}-files`}>浏览文件</label>
+              <label className="upload-browse-btn" htmlFor={`${inputKey}-files`}>上传文件</label>
               <input id={`${inputKey}-files`} hidden type="file" multiple onChange={(event) => { updateFiles(event.target.files); event.currentTarget.value = '' }} />
               <label className="upload-browse-btn is-ghost" htmlFor={`${inputKey}-folder`}>选择文件夹</label>
               <input id={`${inputKey}-folder`} hidden type="file" multiple ref={(node) => node?.setAttribute('webkitdirectory', '')} onChange={(event) => { updateFiles(event.target.files); event.currentTarget.value = '' }} />
@@ -284,7 +284,6 @@ export default function CorpusUpload() {
     event.preventDefault()
     if (!license || !openness) return notify('请选择许可协议和开放程度')
     if (!uploadReady('sample')) return notify('请上传示例数据')
-    if (openness === '部分公开' && !uploadReady('public')) return notify('请上传对外公开的部分数据')
     if (!uploadReady('all')) return notify('请上传全部数据')
     setStep(3)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -380,8 +379,8 @@ export default function CorpusUpload() {
                     )}
                     {organization === '其他' && <label><span>其他机构名称 *</span><input required value={customOrganization} onChange={(event) => setCustomOrganization(event.target.value)} placeholder="请输入机构名称" /></label>}
                     <label><span>发布机构所在省份 *</span><select required value={province} onChange={(event) => setProvince(event.target.value)}><option value="">请选择省份</option>{provinces.map((item) => <option key={item}>{item}</option>)}</select></label>
-                    <div className="upload-size-cell"><label><span>语料规模 *</span><select required value={corpusSize} onChange={(event) => setCorpusSize(event.target.value)}><option value="">请选择</option>{['1千以下', '1千-1万', '1万-10万', '10万-100万', '100万以上'].map((item) => <option key={item}>{item}</option>)}</select></label>{corpusSize && <input value={corpusSizeDetail} onChange={(event) => setCorpusSizeDetail(event.target.value)} placeholder="请填写具体语料条数如1000" />}</div>
-                    <div className="upload-size-cell"><label><span>存储容量 *</span><select required value={storageSize} onChange={(event) => setStorageSize(event.target.value)}><option value="">请选择</option>{['<500GB', '500GB-1TB', '1-2TB', '>2TB'].map((item) => <option key={item}>{item}</option>)}</select></label>{storageSize && <input value={storageSizeDetail} onChange={(event) => setStorageSizeDetail(event.target.value)} placeholder="请填写具体语料规模如15GB" />}</div>
+                    <div className="upload-size-cell"><span>语料规模 *</span><div className="upload-size-controls"><select required value={corpusSize} onChange={(event) => setCorpusSize(event.target.value)}><option value="">请选择</option>{['1千以下', '1千-1万', '1万-10万', '10万-100万', '100万以上'].map((item) => <option key={item}>{item}</option>)}</select><input value={corpusSizeDetail} onChange={(event) => setCorpusSizeDetail(event.target.value)} placeholder="请填写具体语料条数如1000" /></div></div>
+                    <div className="upload-size-cell"><span>存储容量 *</span><div className="upload-size-controls"><select required value={storageSize} onChange={(event) => setStorageSize(event.target.value)}><option value="">请选择</option>{['<500GB', '500GB-1TB', '1-2TB', '>2TB'].map((item) => <option key={item}>{item}</option>)}</select><input value={storageSizeDetail} onChange={(event) => setStorageSizeDetail(event.target.value)} placeholder="请填写具体语料规模如15GB" /></div></div>
                     <label><span>对外供给情况 *</span><select required value={supplyStatus} onChange={(event) => setSupplyStatus(event.target.value)}><option value="">请选择</option>{['部分提供公开检索服务', '提供对外供给服务', '提供公开检索服务', '无对外供给', '依申请开放', '已公开提供'].map((item) => <option key={item}>{item}</option>)}</select></label>
                     <label><span>供给方式 *</span><select required value={supplyMode} onChange={(event) => setSupplyMode(event.target.value)}><option value="">请选择</option><option>开源</option><option>闭源</option><option>定向</option></select></label>
                   </div>
@@ -394,10 +393,9 @@ export default function CorpusUpload() {
               <form onSubmit={submitFiles}>
                 <header className="upload-form-title"><div><span>第二步</span><h2>上传语料库</h2></div><p>示例数据与全部数据均为必传内容</p></header>
                 <section className="upload-form-section">
-                  <div className="upload-field-grid compact-grid"><label><span>语料库文件的许可协议 *</span><select required value={license} onChange={(event) => setLicense(event.target.value)}><option value="">请选择许可协议</option>{['CC0（完全开放无版权限制）', 'CC BY 4.0 保留作者署名', 'CC BY-SA 4.0 保留作者署名并要求使用者以相同许可协议分发其衍生作品', 'CC BY-NC 4.0 保留作者署名并禁止该数据用于任何商业目的', 'CC BY-NC-SA 4.0 保留作者署名，禁止该数据用于任何商业目的，并要求使用者以相同许可协议分发其衍生作品', 'CC BY-ND 4.0 保留作者署名并禁止使用者对数据进行修改、转换或创作', 'CC BY-NC-ND 4.0 保留作者署名，禁止该数据用于任何商业目的，并禁止使用者对数据进行修改、转换或创作'].map((item) => <option key={item}>{item}</option>)}</select></label><label><span>开放程度 *</span><select required value={openness} onChange={(event) => setOpenness(event.target.value)}><option value="">请选择开放程度</option><option>公开</option><option>部分公开</option><option>不公开</option></select></label></div>
+                  <div className="upload-field-grid compact-grid"><label><span>语料库文件的许可协议 *</span><select required value={license} onChange={(event) => setLicense(event.target.value)}><option value="">请选择许可协议</option>{['CC0（完全开放无版权限制）', 'CC BY 4.0 保留作者署名', 'CC BY-SA 4.0 保留作者署名并要求使用者以相同许可协议分发其衍生作品', 'CC BY-NC 4.0 保留作者署名并禁止该数据用于任何商业目的', 'CC BY-NC-SA 4.0 保留作者署名，禁止该数据用于任何商业目的，并要求使用者以相同许可协议分发其衍生作品', 'CC BY-ND 4.0 保留作者署名并禁止使用者对数据进行修改、转换或创作', 'CC BY-NC-ND 4.0 保留作者署名，禁止该数据用于任何商业目的，并禁止使用者对数据进行修改、转换或创作'].map((item) => <option key={item}>{item}</option>)}</select></label><label><span>开放程度 *</span><select required value={openness} onChange={(event) => setOpenness(event.target.value)}><option value="">请选择开放程度</option><option>公开</option><option>不公开</option></select></label></div>
                   <div className="upload-open-note"><ShieldCheck size={18} /><p>开放程度决定公众可下载的数据范围。平台管理员及被授权成员仍可按权限使用完整数据。</p></div>
-                  <UploadGroup title="示例数据上传" required description="公开、部分公开和不公开语料库均需提供可展示的示例数据" state={uploads.sample} onChange={(value) => updateUpload('sample', value)} />
-                  {openness === '部分公开' && <UploadGroup title="公开部分数据" required description="上传允许公众直接浏览或下载的那部分数据" state={uploads.public} onChange={(value) => updateUpload('public', value)} />}
+                  <UploadGroup title="示例数据上传" required description="公开与不公开语料库均需提供可展示的示例数据" state={uploads.sample} onChange={(value) => updateUpload('sample', value)} />
                   <UploadGroup title="全部数据" required description="上传语料库完整数据，实际下载范围将依据用户权限和开放程度控制" state={uploads.all} onChange={(value) => updateUpload('all', value)} />
                 </section>
                 <div className="upload-form-actions"><button type="button" onClick={() => saveDraft()}><Save size={16} />保存</button><button type="button" onClick={() => setStep(1)}>上一步</button><button type="submit" className="is-primary">下一步<ChevronRight size={16} /></button></div>
@@ -409,7 +407,7 @@ export default function CorpusUpload() {
                 <header className="upload-form-title"><div><span>第三步</span><h2>确认信息</h2></div><p>请核对以下内容，确认无误后提交审核</p></header>
                 <section className="upload-confirm-section"><h3>作者信息</h3>{authors.map((author, index) => <div className="confirm-author" key={index}><strong>{author.name}</strong><span>{author.contact}</span><span>{author.organization}</span></div>)}</section>
                 <section className="upload-confirm-section"><h3>语料库信息</h3><dl><div><dt>语料库名称</dt><dd>{corpusName}</dd></div><div><dt>语料库关键词</dt><dd>{keywords.join('、')}</dd></div><div className="is-wide"><dt>语料库介绍</dt><dd>{introduction}</dd></div><div className="is-wide"><dt>主要数据来源</dt><dd>{dataSource}</dd></div><div><dt>学科领域</dt><dd>{subject}</dd></div><div><dt>语料类型</dt><dd>{corpusType}</dd></div><div><dt>发布机构</dt><dd>{effectiveOrganization}</dd></div><div><dt>所在省份</dt><dd>{province}</dd></div><div><dt>语料规模</dt><dd>{corpusSize}</dd></div><div><dt>存储容量</dt><dd>{storageSize}</dd></div><div><dt>对外供给</dt><dd>{supplyStatus}</dd></div><div><dt>供给方式</dt><dd>{supplyMode}</dd></div></dl></section>
-                <section className="upload-confirm-section"><h3>文件与开放信息</h3><dl><div><dt>许可协议</dt><dd>{license}</dd></div><div><dt>开放程度</dt><dd>{openness}</dd></div><div><dt>示例数据</dt><dd>{groupLabel(uploads.sample)}</dd></div>{openness === '部分公开' && <div><dt>公开部分数据</dt><dd>{groupLabel(uploads.public)}</dd></div>}<div><dt>全部数据</dt><dd>{groupLabel(uploads.all)}</dd></div></dl></section>
+                <section className="upload-confirm-section"><h3>文件与开放信息</h3><dl><div><dt>许可协议</dt><dd>{license}</dd></div><div><dt>开放程度</dt><dd>{openness}</dd></div><div><dt>示例数据</dt><dd>{groupLabel(uploads.sample)}</dd></div><div><dt>全部数据</dt><dd>{groupLabel(uploads.all)}</dd></div></dl></section>
                 <div className="upload-form-actions"><button type="button" onClick={() => saveDraft()}><Save size={16} />保存</button><button type="button" onClick={() => setStep(2)}>上一步</button><button type="button" className="is-primary" onClick={submitReview}>提交审核</button></div>
               </div>
             )}

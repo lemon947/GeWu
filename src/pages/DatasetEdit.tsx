@@ -259,13 +259,19 @@ export default function DatasetEdit() {
           ) : <div />}
           {organization === '其他' && <label className="dataset-edit-field"><span>其他机构名称 *</span><input value={customOrganization} onChange={(event) => setCustomOrganization(event.target.value)} placeholder="请输入机构名称" /></label>}
           <label className="dataset-edit-field"><span>发布机构所在省份 *</span><select value={province} onChange={(event) => setProvince(event.target.value)}><option value="">请选择省份</option>{provinces.map((item) => <option key={item}>{item}</option>)}</select></label>
-          <div className="dataset-edit-cell">
-            <label className="dataset-edit-field"><span>语料规模 *</span><select value={corpusSize} onChange={(event) => setCorpusSize(event.target.value)}><option value="">请选择</option>{['1千以下', '1千-1万', '1万-10万', '10万-100万', '100万以上'].map((item) => <option key={item}>{item}</option>)}</select></label>
-            {corpusSize && <input className="dataset-edit-detail" value={corpusSizeDetail} onChange={(event) => setCorpusSizeDetail(event.target.value)} placeholder="请填写具体语料条数如1000" />}
+          <div className="dataset-edit-field dataset-edit-cell">
+            <span>语料规模 *</span>
+            <div className="dataset-edit-controls">
+              <select value={corpusSize} onChange={(event) => setCorpusSize(event.target.value)}><option value="">请选择</option>{['1千以下', '1千-1万', '1万-10万', '10万-100万', '100万以上'].map((item) => <option key={item}>{item}</option>)}</select>
+              <input className="dataset-edit-detail" value={corpusSizeDetail} onChange={(event) => setCorpusSizeDetail(event.target.value)} placeholder="请填写具体语料条数如1000" />
+            </div>
           </div>
-          <div className="dataset-edit-cell">
-            <label className="dataset-edit-field"><span>存储容量 *</span><select value={storageSize} onChange={(event) => setStorageSize(event.target.value)}><option value="">请选择</option>{['<500GB', '500GB-1TB', '1-2TB', '>2TB'].map((item) => <option key={item}>{item}</option>)}</select></label>
-            {storageSize && <input className="dataset-edit-detail" value={storageSizeDetail} onChange={(event) => setStorageSizeDetail(event.target.value)} placeholder="请填写具体语料规模如15GB" />}
+          <div className="dataset-edit-field dataset-edit-cell">
+            <span>存储容量 *</span>
+            <div className="dataset-edit-controls">
+              <select value={storageSize} onChange={(event) => setStorageSize(event.target.value)}><option value="">请选择</option>{['<500GB', '500GB-1TB', '1-2TB', '>2TB'].map((item) => <option key={item}>{item}</option>)}</select>
+              <input className="dataset-edit-detail" value={storageSizeDetail} onChange={(event) => setStorageSizeDetail(event.target.value)} placeholder="请填写具体语料规模如15GB" />
+            </div>
           </div>
           <label className="dataset-edit-field"><span>对外供给情况 *</span><select value={supplyStatus} onChange={(event) => setSupplyStatus(event.target.value)}><option value="">请选择</option>{['部分提供公开检索服务', '提供对外供给服务', '提供公开检索服务', '无对外供给', '依申请开放', '已公开提供'].map((item) => <option key={item}>{item}</option>)}</select></label>
           <label className="dataset-edit-field"><span>供给方式 *</span><select value={supplyMode} onChange={(event) => setSupplyMode(event.target.value)}><option>开源</option><option>闭源</option><option>定向</option></select></label>
