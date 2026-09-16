@@ -22033,3 +22033,29 @@ body {
   border: 1px solid #dfe2ee;
   box-shadow: none;
 }
+
+/* Org tag inputs (企业 / 新型研发机构) */
+.upload-org-tags {
+  display: grid;
+  gap: 8px;
+}
+
+.upload-org-tags > span {
+  color: #526d78;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Align size rows with sibling fields (avoid double spacing) */
+.dataset-edit-cell > span {
+  margin: 0;
+}
+
+.dataset-edit-grid {
+  align-items: start;
+}
+
+.dataset-edit-cell .dataset-edit-controls select,
+.dataset-edit-cell .dataset-edit-controls input {
+  min-height: 44px;
+}

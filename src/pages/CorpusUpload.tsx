@@ -17,7 +17,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useApp } from '../context/app-context'
 import { corpusRecords } from './CorpusSearch'
 
@@ -51,6 +51,11 @@ type UploadDraftData = {
   orgType: string
   organization: string
   customOrganization: string
+  orgTags: string[]
+  language: string
+  languageCustom: string
+  format: string
+  timeSpan: string
   province: string
   corpusSize: string
   corpusSizeDetail: string
@@ -145,7 +150,6 @@ function UploadGroup({ title, required, description, state, onChange }: { title:
 
 export default function CorpusUpload() {
   const { user, openAuth } = useApp()
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const editRecord = useMemo(() => corpusRecords.find((item) => item.id === searchParams.get('edit')), [searchParams])
   const [step, setStep] = useState(1)
@@ -167,6 +171,12 @@ export default function CorpusUpload() {
     ? (editRecord.organization === '北京大学' && editRecord.authors.startsWith('北京大学') ? `${editRecord.organization}·${editRecord.authors.replace('北京大学', '')}` : editRecord.organization)
     : '')
   const [customOrganization, setCustomOrganization] = useState('')
+  const [orgTags, setOrgTags] = useState<string[]>([])
+  const [orgTagInput, setOrgTagInput] = useState('')
+  const [language, setLanguage] = useState('')
+  const [languageCustom, setLanguageCustom] = useState('')
+  const [format, setFormat] = useState('')
+  const [timeSpan, setTimeSpan] = useState('')
   const [province, setProvince] = useState('')
   const [corpusSize, setCorpusSize] = useState('')
   const [corpusSizeDetail, setCorpusSizeDetail] = useState('')
@@ -188,6 +198,21 @@ export default function CorpusUpload() {
   }
 
   const updateAuthor = (index: number, key: keyof Author, value: string) => setAuthors((current) => current.map((author, position) => position === index ? { ...author, [key]: value } : author))
+
+  const addOrgTag = () => {
+    const value = orgTagInput.trim()
+    if (!value) return
+    if (orgTags.includes(value)) {
+      setOrgTagInput('')
+      return
+    }
+    if (orgTags.length >= 10) {
+      notify('最多添加 10 个机构名称')
+      return
+    }
+    setOrgTags((current) => [...current, value])
+    setOrgTagInput('')
+  }
 
   const addKeyword = () => {
     const value = keywordInput.trim()
@@ -212,7 +237,7 @@ export default function CorpusUpload() {
       id,
       savedAt: draftStamp(),
       step,
-      data: { taskName, authors, corpusName, introduction, keywords, dataSource, subject, corpusType, orgType, organization, customOrganization, province, corpusSize, corpusSizeDetail, storageSize, storageSizeDetail, supplyStatus, supplyMode, license, openness, uploads },
+      data: { taskName, authors, corpusName, introduction, keywords, dataSource, subject, corpusType, orgType, organization, customOrganization, orgTags, language, languageCustom, format, timeSpan, province, corpusSize, corpusSizeDetail, storageSize, storageSizeDetail, supplyStatus, supplyMode, license, openness, uploads },
     }
     const next = [record, ...loadDraftList(user.account).filter((item) => item.id !== id)]
     persistDraftList(user.account, next)
@@ -235,6 +260,11 @@ export default function CorpusUpload() {
     setOrgType(data.orgType)
     setOrganization(data.organization)
     setCustomOrganization(data.customOrganization)
+    setOrgTags(data.orgTags ?? [])
+    setLanguage(data.language ?? '')
+    setLanguageCustom(data.languageCustom ?? '')
+    setFormat(data.format ?? '')
+    setTimeSpan(data.timeSpan ?? '')
     setProvince(data.province)
     setCorpusSize(data.corpusSize)
     setCorpusSizeDetail(data.corpusSizeDetail)
@@ -262,13 +292,26 @@ export default function CorpusUpload() {
   }
 
   const nameSuggestions = corpusName.trim().length > 1 ? corpusRecords.filter((item) => item.title.includes(corpusName.trim()) && item.title !== corpusName).slice(0, 5) : []
-  const effectiveOrganization = orgType === '个人' ? '个人' : organization === '其他' ? customOrganization : organization
+  const effectiveOrganization = orgType === '个人'
+    ? '个人'
+    : orgType === '企业' || orgType === '新型研发机构'
+      ? orgTags.join('、')
+      : (organization === '其他' || organization === '北京大学·其他') ? customOrganization : organization
 
   const submitBasic = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!taskName.trim()) return notify('请填写任务名称')
     if (!subject) return notify('请选择学科领域')
     if (!keywords.length) return notify('请至少添加一个语料库关键词')
+    if (!language) return notify('请选择语种类别')
+    if (language === '其他' && !languageCustom.trim()) return notify('请填写语种类别')
+    if (!format.trim()) return notify('请填写语料格式')
+    if (!timeSpan.trim()) return notify('请填写时间跨度')
+    if (orgType === '高校') {
+      if (!organization) return notify('请选择发布机构')
+      if ((organization === '其他' || organization === '北京大学·其他') && !customOrganization.trim()) return notify('请填写机构名称')
+    }
+    if ((orgType === '企业' || orgType === '新型研发机构') && orgTags.length === 0) return notify('请至少填写一个机构名称')
     if (!corpusType) return notify('请选择语料类型')
     setStep(2)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -361,23 +404,38 @@ export default function CorpusUpload() {
                   </div>
                   <div className="upload-choice-field"><span>语料类型 *</span><div className="option-pill-row">{['预训练', '后训练', 'RAG', '微调'].map((item) => <label className={corpusType === item ? 'is-selected' : ''} key={item}><input type="radio" name="corpus-type" checked={corpusType === item} onChange={() => setCorpusType(item)} />{item}</label>)}</div></div>
 
+                  <div className="upload-field-grid">
+                    <label><span>语种类别 *</span><select required value={language} onChange={(event) => setLanguage(event.target.value)}><option value="">请选择</option><option>中文/英文</option><option>中文</option><option>英文</option><option>其他</option></select></label>
+                    {language === '其他' && <label><span>其他语种类别 *</span><input required value={languageCustom} onChange={(event) => setLanguageCustom(event.target.value)} placeholder="请填写语种类别" /></label>}
+                    <label><span>语料格式 *</span><input required value={format} onChange={(event) => setFormat(event.target.value)} placeholder="如 CSV / JSON / SQL" /></label>
+                    <label><span>时间跨度 *</span><input required value={timeSpan} onChange={(event) => setTimeSpan(event.target.value)} placeholder="如 2000年-至今" /></label>
+                  </div>
+
                   <div className="upload-field-grid compact-grid">
-                    <label><span>发布机构类型 *</span><select required value={orgType} onChange={(event) => { setOrgType(event.target.value); setOrganization('') }}><option value="">请选择</option><option>高校</option><option>企业</option><option>新型研发机构</option><option>个人</option></select></label>
-                    {orgType && orgType !== '个人' && (
+                    <label><span>发布机构类型 *</span><select required value={orgType} onChange={(event) => { setOrgType(event.target.value); setOrganization(''); setCustomOrganization(''); setOrgTags([]); setOrgTagInput('') }}><option value="">请选择</option><option>高校</option><option>企业</option><option>新型研发机构</option><option>个人</option></select></label>
+                    {orgType === '高校' && (
                       <label><span>发布机构 *</span>
                         <select required value={organization} onChange={(event) => setOrganization(event.target.value)}>
                           <option value="">请选择</option>
-                          {orgType === '高校' ? (
-                            <>
-                              <option value="北京大学">北京大学</option>
-                              {pkuDepartments.filter((name) => name !== '其他').map((name) => <option value={`北京大学·${name}`} key={name}>{`　　${name}`}</option>)}
-                              {universities.filter((name) => name !== '北京大学').map((name) => <option key={name}>{name}</option>)}
-                            </>
-                          ) : (orgType === '企业' ? ['深势科技', '其他'] : ['北京科学智能研究院', '其他']).map((name) => <option key={name}>{name}</option>)}
+                          <option value="北京大学">北京大学</option>
+                          {pkuDepartments.map((name) => <option value={name === '其他' ? '北京大学·其他' : `北京大学·${name}`} key={name}>{`　　${name}`}</option>)}
+                          {universities.filter((name) => name !== '北京大学' && name !== '其他').map((name) => <option key={name}>{name}</option>)}
+                          <option value="其他">其他</option>
                         </select>
                       </label>
                     )}
-                    {organization === '其他' && <label><span>其他机构名称 *</span><input required value={customOrganization} onChange={(event) => setCustomOrganization(event.target.value)} placeholder="请输入机构名称" /></label>}
+                    {orgType === '高校' && (organization === '其他' || organization === '北京大学·其他') && (
+                      <label><span>{organization === '其他' ? '其他高校名称 *' : '其他院系名称 *'}</span><input required value={customOrganization} onChange={(event) => setCustomOrganization(event.target.value)} placeholder="请输入机构名称" /></label>
+                    )}
+                    {(orgType === '企业' || orgType === '新型研发机构') && (
+                      <div className="is-wide upload-org-tags">
+                        <span>{orgType === '企业' ? '企业名称 *（至少填写一个）' : '机构名称 *（至少填写一个）'}</span>
+                        <div className="keyword-box">
+                          <input value={orgTagInput} onChange={(event) => setOrgTagInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addOrgTag() } }} placeholder="输入后按回车添加，支持添加多个" />
+                          {orgTags.length > 0 && <div className="keyword-chips">{orgTags.map((tag) => <span key={tag}>{tag}<button type="button" aria-label={`删除 ${tag}`} onClick={() => setOrgTags((current) => current.filter((item) => item !== tag))}><X size={11} /></button></span>)}</div>}
+                        </div>
+                      </div>
+                    )}
                     <label><span>发布机构所在省份 *</span><select required value={province} onChange={(event) => setProvince(event.target.value)}><option value="">请选择省份</option>{provinces.map((item) => <option key={item}>{item}</option>)}</select></label>
                     <div className="upload-size-cell"><span>语料规模 *</span><div className="upload-size-controls"><select required value={corpusSize} onChange={(event) => setCorpusSize(event.target.value)}><option value="">请选择</option>{['1千以下', '1千-1万', '1万-10万', '10万-100万', '100万以上'].map((item) => <option key={item}>{item}</option>)}</select><input value={corpusSizeDetail} onChange={(event) => setCorpusSizeDetail(event.target.value)} placeholder="请填写具体语料条数如1000" /></div></div>
                     <div className="upload-size-cell"><span>存储容量 *</span><div className="upload-size-controls"><select required value={storageSize} onChange={(event) => setStorageSize(event.target.value)}><option value="">请选择</option>{['<500GB', '500GB-1TB', '1-2TB', '>2TB'].map((item) => <option key={item}>{item}</option>)}</select><input value={storageSizeDetail} onChange={(event) => setStorageSizeDetail(event.target.value)} placeholder="请填写具体语料规模如15GB" /></div></div>
@@ -406,13 +464,13 @@ export default function CorpusUpload() {
               <div>
                 <header className="upload-form-title"><div><span>第三步</span><h2>确认信息</h2></div><p>请核对以下内容，确认无误后提交审核</p></header>
                 <section className="upload-confirm-section"><h3>作者信息</h3>{authors.map((author, index) => <div className="confirm-author" key={index}><strong>{author.name}</strong><span>{author.contact}</span><span>{author.organization}</span></div>)}</section>
-                <section className="upload-confirm-section"><h3>语料库信息</h3><dl><div><dt>语料库名称</dt><dd>{corpusName}</dd></div><div><dt>语料库关键词</dt><dd>{keywords.join('、')}</dd></div><div className="is-wide"><dt>语料库介绍</dt><dd>{introduction}</dd></div><div className="is-wide"><dt>主要数据来源</dt><dd>{dataSource}</dd></div><div><dt>学科领域</dt><dd>{subject}</dd></div><div><dt>语料类型</dt><dd>{corpusType}</dd></div><div><dt>发布机构</dt><dd>{effectiveOrganization}</dd></div><div><dt>所在省份</dt><dd>{province}</dd></div><div><dt>语料规模</dt><dd>{corpusSize}</dd></div><div><dt>存储容量</dt><dd>{storageSize}</dd></div><div><dt>对外供给</dt><dd>{supplyStatus}</dd></div><div><dt>供给方式</dt><dd>{supplyMode}</dd></div></dl></section>
+                <section className="upload-confirm-section"><h3>语料库信息</h3><dl><div><dt>语料库名称</dt><dd>{corpusName}</dd></div><div><dt>语料库关键词</dt><dd>{keywords.join('、')}</dd></div><div className="is-wide"><dt>语料库介绍</dt><dd>{introduction}</dd></div><div className="is-wide"><dt>主要数据来源</dt><dd>{dataSource}</dd></div><div><dt>学科领域</dt><dd>{subject}</dd></div><div><dt>语料类型</dt><dd>{corpusType}</dd></div><div><dt>语种类别</dt><dd>{language === '其他' ? languageCustom : language}</dd></div><div><dt>语料格式</dt><dd>{format}</dd></div><div><dt>时间跨度</dt><dd>{timeSpan}</dd></div><div><dt>发布机构</dt><dd>{effectiveOrganization}</dd></div><div><dt>所在省份</dt><dd>{province}</dd></div><div><dt>语料规模</dt><dd>{corpusSize}</dd></div><div><dt>存储容量</dt><dd>{storageSize}</dd></div><div><dt>对外供给</dt><dd>{supplyStatus}</dd></div><div><dt>供给方式</dt><dd>{supplyMode}</dd></div></dl></section>
                 <section className="upload-confirm-section"><h3>文件与开放信息</h3><dl><div><dt>许可协议</dt><dd>{license}</dd></div><div><dt>开放程度</dt><dd>{openness}</dd></div><div><dt>示例数据</dt><dd>{groupLabel(uploads.sample)}</dd></div><div><dt>全部数据</dt><dd>{groupLabel(uploads.all)}</dd></div></dl></section>
                 <div className="upload-form-actions"><button type="button" onClick={() => saveDraft()}><Save size={16} />保存</button><button type="button" onClick={() => setStep(2)}>上一步</button><button type="button" className="is-primary" onClick={submitReview}>提交审核</button></div>
               </div>
             )}
 
-            {step === 4 && <div className="upload-success"><CheckCircle2 size={64} /><span>第四步</span><h2>语料库上传成功</h2><p>平台已收到您的语料库信息和文件，审核进度与结果可在个人主页查看。</p><div><Link to="/profile">前往个人主页</Link><button type="button" onClick={() => navigate(`/search/datasets/${editRecord?.id ?? corpusRecords[0].id}`)}>查看语料详情</button></div></div>}
+            {step === 4 && <div className="upload-success"><CheckCircle2 size={64} /><span>第四步</span><h2>语料库上传成功</h2><p>平台已收到您的语料库信息和文件，审核进度与结果可在个人主页查看。</p><div><Link to="/profile">前往个人主页</Link></div></div>}
           </section>
         </div>
       </div>
