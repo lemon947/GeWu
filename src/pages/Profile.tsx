@@ -16,7 +16,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useApp } from '../context/app-context'
 import { corpusRecords, type CorpusRecord } from './CorpusSearch'
 import { DemandPoster, initialDemandPosts, type DemandPost } from './DemandSquare'
@@ -95,6 +95,41 @@ const communityUsers: CommunityUser[] = [
   { id: 'user-xu', name: '许青', role: '天文观测数据研究者 · 厦门大学', following: false },
   { id: 'user-he', name: '何静', role: '材料计算方向 · 北京石墨烯研究院', following: false },
 ]
+
+type VisitorProfile = {
+  name: string
+  organization: string
+  contact: string
+  bio: string
+  following: number
+  fans: number
+  collections: number
+  mutual?: boolean
+  corpora: string[]
+  demandOffset: number
+}
+
+const visitorProfiles: Record<string, VisitorProfile> = {
+  'user-lin': { name: '林知远', organization: '北京大学化学与分子工程学院', contact: 'linzhiyuan@example.edu', bio: '材料语料发起人，关注分子材料与结构化语料建设。', following: 38, fans: 426, collections: 1208, corpora: ['chem-01', 'chem-02', 'chem-04', 'bio-02', 'geo-04', 'math-03'], demandOffset: 0 },
+  'user-zhang': { name: '张伟', organization: '北京大学', contact: 'zhangwei@example.edu', bio: '语料平台科研用户，关注科学数据治理与开放共享。', following: 22, fans: 168, collections: 342, mutual: true, corpora: ['geo-04', 'astro-01', 'bio-02', 'math-03', 'chem-02', 'geo-02'], demandOffset: 2 },
+  'user-lab': { name: '医学语料联合实验室', organization: '北京大学健康医疗大数据国家研究院', contact: 'medlab@example.edu', bio: '生物医学语料团队，建设影像与报告配对语料。', following: 16, fans: 892, collections: 2341, mutual: true, corpora: ['bio-01', 'bio-02', 'geo-01', 'math-01', 'chem-01', 'astro-02'], demandOffset: 1 },
+  'user-chen': { name: '陈明', organization: '北京大学数学科学学院', contact: 'chenming@example.edu', bio: '形式化数学研究者，关注定理证明语料与推理链标注。', following: 72, fans: 311, collections: 760, mutual: true, corpora: ['math-01', 'math-02', 'math-03', 'physics-01', 'physics-03', 'chem-01'], demandOffset: 3 },
+}
+
+function visitorFallback(id: string): VisitorProfile {
+  const base = communityUsers.find((item) => item.id === id)
+  return {
+    name: base?.name ?? '语料用户',
+    organization: base?.role.split(' · ')[1] ?? '暂未填写机构',
+    contact: '',
+    bio: base?.role.split(' · ')[0] ?? '',
+    following: 12,
+    fans: 64,
+    collections: 156,
+    corpora: ['math-01', 'physics-01', 'chem-01', 'geo-04', 'bio-02', 'astro-02'],
+    demandOffset: 1,
+  }
+}
 
 const notices: Notice[] = [
   { id: 1, role: 'admin', kind: 'pending', corpusId: 'math-01', corpusName: '基础数学定理证明长思维链语料', userName: '李思远', time: '2026-09-05 14:22' },
@@ -202,6 +237,10 @@ function noticeView(notice: Notice) {
 export default function Profile() {
   const { user, openAuth, favorites } = useApp()
   const navigate = useNavigate()
+  const { profileId } = useParams()
+  const isVisitor = Boolean(profileId)
+  const visitor = isVisitor ? (visitorProfiles[profileId as string] ?? visitorFallback(profileId as string)) : null
+  const [visitorFollowed, setVisitorFollowed] = useState(() => Boolean(visitor?.mutual))
   const [searchParams, setSearchParams] = useSearchParams()
   const updateParams = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams)
@@ -280,7 +319,12 @@ export default function Profile() {
   const corpusList = corpusTab === 'managed' ? managedCorpora : corpusTab === 'joined' ? joinedCorpora : corpusTab === 'commented' ? commentedCorpora : favoriteCorpora
   const visibleCorpora = corpusList.slice((corpusPage - 1) * 6, corpusPage * 6)
 
-  const demandMap: Record<'published' | 'favorited' | 'commented', DemandPost[]> = {
+  const demandOffset = visitor?.demandOffset ?? 0
+  const demandMap: Record<'published' | 'favorited' | 'commented', DemandPost[]> = isVisitor ? {
+    published: initialDemandPosts.slice(demandOffset, demandOffset + 5),
+    favorited: [...initialDemandPosts].reverse().slice(demandOffset, demandOffset + 5),
+    commented: initialDemandPosts.slice(demandOffset + 1, demandOffset + 6),
+  } : {
     published: initialDemandPosts.slice(0, 7),
     favorited: [...initialDemandPosts].reverse().slice(0, 7),
     commented: initialDemandPosts.slice(2, 9),
@@ -422,7 +466,7 @@ export default function Profile() {
     setModal(null)
   }
 
-  if (!user) {
+  if (!user && !isVisitor) {
     return (
       <main className="profile-page profile-guest-page">
         <section className="profile-guest-card">
@@ -438,25 +482,40 @@ export default function Profile() {
   return (
     <main className="profile-page">
       <div className="profile-layout">
-        <aside className="profile-side">
+        <aside className={`profile-side${isVisitor ? ' is-visitor' : ''}`}>
           <section className="profile-user-card-top">
-            <button className="profile-avatar-button" type="button" onClick={() => openModal('avatar')} aria-label="编辑头像">
-              {profile.avatar ? <img src={profile.avatar} alt="" /> : <span>{profile.username.slice(0, 1)}</span>}
-              <i><Camera size={13} /></i>
-            </button>
-            <h1>{profile.username || '未设置用户名'}</h1>
-            <p><Building2 size={14} />{profile.institution || '暂未填写机构'}</p>
-            {profile.contact && <p className="profile-contact"><UserRound size={14} />{profile.contact}</p>}
-            {(profile.researchField || profile.position) && (
+            {isVisitor ? (
+              <span className="profile-avatar-button is-static"><span>{(visitor?.name ?? '语').slice(0, 1)}</span></span>
+            ) : (
+              <button className="profile-avatar-button" type="button" onClick={() => openModal('avatar')} aria-label="编辑头像">
+                {profile.avatar ? <img src={profile.avatar} alt="" /> : <span>{profile.username.slice(0, 1)}</span>}
+                <i><Camera size={13} /></i>
+              </button>
+            )}
+            <h1>{(isVisitor ? visitor?.name : profile.username) || '未设置用户名'}</h1>
+            <p><Building2 size={14} />{(isVisitor ? visitor?.organization : profile.institution) || '暂未填写机构'}</p>
+            {(isVisitor ? visitor?.contact : profile.contact) && <p className="profile-contact"><UserRound size={14} />{isVisitor ? visitor?.contact : profile.contact}</p>}
+            {!isVisitor && (profile.researchField || profile.position) && (
               <p className="profile-contact">{[profile.researchField, profile.position].filter(Boolean).join(' · ')}</p>
             )}
-            {profile.bio && <p className="profile-bio">{profile.bio}</p>}
+            {(isVisitor ? visitor?.bio : profile.bio) && <p className="profile-bio">{isVisitor ? visitor?.bio : profile.bio}</p>}
             <div className="profile-stats">
-              <span><b>{communityUsers.filter((item) => userFollowed[item.id]).length}</b>关注</span>
-              <span><b>128</b>粉丝</span>
-              <span><b>{totalCollected.toLocaleString()}</b>被收藏</span>
+              <span><b>{isVisitor ? visitor?.following : communityUsers.filter((item) => userFollowed[item.id]).length}</b>关注</span>
+              <span><b>{isVisitor ? visitor?.fans : 128}</b>粉丝</span>
+              <span><b>{isVisitor ? (visitor?.collections ?? 0).toLocaleString() : totalCollected.toLocaleString()}</b>被收藏</span>
             </div>
-            <button className="profile-edit-basic" type="button" onClick={() => openModal('basic')}><Pencil size={15} />编辑基本信息</button>
+            {isVisitor ? (
+              <button
+                className={`profile-follow-btn${visitorFollowed ? ' is-followed is-hoverable' : ''}`}
+                type="button"
+                data-tooltip={visitorFollowed ? '取消关注' : undefined}
+                onClick={() => setVisitorFollowed((value) => !value)}
+              >
+                {visitorFollowed ? (visitor?.mutual ? '互相关注' : '已关注') : '关注'}
+              </button>
+            ) : (
+              <button className="profile-edit-basic" type="button" onClick={() => openModal('basic')}><Pencil size={15} />编辑基本信息</button>
+            )}
           </section>
 
           <section className="profile-messages">
@@ -494,23 +553,27 @@ export default function Profile() {
 
         <section className="profile-main">
           <nav className="profile-main-tabs">
-            <button type="button" className={activeTab === 'corpora' ? 'is-active' : ''} onClick={() => { setActiveTab('corpora'); setCorpusPage(1) }}>我的语料库</button>
+            <button type="button" className={activeTab === 'corpora' ? 'is-active' : ''} onClick={() => { setActiveTab('corpora'); setCorpusPage(1) }}>{isVisitor ? '语料库' : '我的语料库'}</button>
             <button type="button" className={activeTab === 'demands' ? 'is-active' : ''} onClick={() => { setActiveTab('demands'); setDemandPage(1) }}>需求动态</button>
             <button type="button" className={activeTab === 'social' ? 'is-active' : ''} onClick={() => setActiveTab('social')}>关注与粉丝</button>
-            <button type="button" className={activeTab === 'submit' ? 'is-active' : ''} onClick={() => { setActiveTab('submit'); setSubmitPage(1) }}>汇交记录</button>
+            {!isVisitor && (
+              <>
+                <button type="button" className={activeTab === 'submit' ? 'is-active' : ''} onClick={() => { setActiveTab('submit'); setSubmitPage(1) }}>汇交记录</button>
             {/* 审核工作台暂不上线，保留代码备用
             <button type="button" className={activeTab === 'audit' ? 'is-active' : ''} onClick={() => setActiveTab('audit')}>审核工作台</button>
             */}
-            <button type="button" className={activeTab === 'privacy' ? 'is-active' : ''} onClick={() => setActiveTab('privacy')}>隐私设置</button>
+                <button type="button" className={activeTab === 'privacy' ? 'is-active' : ''} onClick={() => setActiveTab('privacy')}>隐私设置</button>
+              </>
+            )}
           </nav>
 
           {activeTab === 'corpora' && (
             <>
               <header className="profile-section-header">
-                <h2>我的语料库</h2>
+                <h2>{isVisitor ? '语料库' : '我的语料库'}</h2>
                 <div className="profile-sub-tabs">
                   {([['managed', '我管理的'], ['joined', '我加入的'], ['favorite', '我收藏的'], ['commented', '我评论的']] as Array<[CorpusTab, string]>).map(([key, label]) => (
-                    <button type="button" className={corpusTab === key ? 'is-active' : ''} key={key} onClick={() => { setCorpusTab(key); setCorpusPage(1) }}>{label}</button>
+                    <button type="button" className={corpusTab === key ? 'is-active' : ''} key={key} onClick={() => { setCorpusTab(key); setCorpusPage(1) }}>{isVisitor ? label.replace('我', 'TA ') : label}</button>
                   ))}
                 </div>
               </header>

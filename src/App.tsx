@@ -39,6 +39,7 @@ export default function App() {
         <Route path="/demands/new/poster" element={<DemandPosterMaker />} />
         <Route path="/demands/:id" element={<DemandDetail />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/:profileId" element={<Profile />} />
         <Route path="/tools" element={<ToolMarket />} />
         <Route path="/about" element={<About />} />
       </Route>

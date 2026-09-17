@@ -711,11 +711,13 @@ export default function DatasetDetail() {
 
           <section className="dataset-side-card author-card">
             <div className="author-card-main">
-              <div className="author-avatar">张</div>
-              <div className="author-card-copy">
-                <h2>张伟</h2>
-                <p>北京大学</p>
-              </div>
+              <button className="author-card-profile" type="button" onClick={() => navigate('/profile/user-zhang')} aria-label="进入张伟的个人主页">
+                <div className="author-avatar">张</div>
+                <div className="author-card-copy">
+                  <h2>张伟</h2>
+                  <p>北京大学</p>
+                </div>
+              </button>
               <button
                 className={authorFollowed ? 'is-followed' : ''}
                 data-tooltip={authorFollowed ? '取消关注' : undefined}
