@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { ArrowLeft, ArrowUpFromLine, Check, Copy, FileArchive, FileText, FolderUp, Github, Link2, Plus, Trash2, X } from 'lucide-react'
-import { corpusRecords, recordDisplayMeta } from './CorpusSearch'
+import { corpusRecords } from './CorpusSearch'
 import { provinces, pkuDepartments, subjectChildren, subjects, universities } from './CorpusUpload'
 
 type Author = { name: string; contact: string; organization: string }
@@ -107,9 +107,9 @@ export default function DatasetEdit() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const item = corpusRecords.find((record) => record.id === id) ?? corpusRecords[0]
-  const meta = recordDisplayMeta(item)
   const [authors, setAuthors] = useState<Author[]>([{ name: '张伟', contact: '', organization: item.authors }])
   const [subject, setSubject] = useState(item.subject)
+  const [subjectCustom, setSubjectCustom] = useState('')
   const [corpusName, setCorpusName] = useState(item.title)
   const [introduction, setIntroduction] = useState(item.summary)
   const [keywordInput, setKeywordInput] = useState('')
@@ -128,10 +128,8 @@ export default function DatasetEdit() {
   })
   const [orgTagInput, setOrgTagInput] = useState('')
   const [province, setProvince] = useState('')
-  const [corpusSize, setCorpusSize] = useState(meta.corpusSize)
-  const [corpusSizeDetail, setCorpusSizeDetail] = useState('')
-  const [storageSize, setStorageSize] = useState(meta.storageSize)
-  const [storageSizeDetail, setStorageSizeDetail] = useState('')
+  const [corpusSize, setCorpusSize] = useState('')
+  const [storageSize, setStorageSize] = useState('')
   const [supplyStatus, setSupplyStatus] = useState(item.openness === '依申请开放' || item.openness === '定向开放' ? '依申请开放' : '已公开提供')
   const [supplyMode, setSupplyMode] = useState('开源')
   const [license, setLicense] = useState('CC BY 4.0 保留作者署名')
@@ -191,6 +189,14 @@ export default function DatasetEdit() {
     }
     if (keywords.length === 0) {
       flashToast('请至少添加一个语料库关键词')
+      return
+    }
+    if (subject === '其他' && !subjectCustom.trim()) {
+      flashToast('请填写学科领域')
+      return
+    }
+    if (!corpusSize.trim() || !storageSize.trim()) {
+      flashToast('请填写语料规模（万条）与存储容量（GB）')
       return
     }
     if (language === '其他' && !languageCustom.trim()) {
@@ -272,8 +278,12 @@ export default function DatasetEdit() {
                   {(subjectChildren[name] ?? []).map((child) => <option value={`${name}·${child}`} key={child}>{`　　${child}`}</option>)}
                 </Fragment>
               ))}
+              <option value="其他">其他</option>
             </select>
           </label>
+          {subject === '其他' && (
+            <label className="dataset-edit-field"><span>其他学科领域 *</span><input value={subjectCustom} onChange={(event) => setSubjectCustom(event.target.value)} placeholder="请填写学科领域" /></label>
+          )}
           <label className="dataset-edit-field"><span>语料类型 *</span><select value={corpusType} onChange={(event) => setCorpusType(event.target.value)}>{['预训练', '后训练', 'RAG', '微调'].map((item) => <option key={item}>{item}</option>)}</select></label>
           <label className="dataset-edit-field"><span>语种类别 *</span><select value={language} onChange={(event) => setLanguage(event.target.value)}><option>中文/英文</option><option>中文</option><option>英文</option><option>其他</option></select></label>
           {language === '其他' && (
@@ -312,15 +322,15 @@ export default function DatasetEdit() {
           <div className="dataset-edit-field dataset-edit-cell">
             <span>语料规模 *</span>
             <div className="dataset-edit-controls">
-              <select value={corpusSize} onChange={(event) => setCorpusSize(event.target.value)}><option value="">请选择</option>{['1千以下', '1千-1万', '1万-10万', '10万-100万', '100万以上'].map((item) => <option key={item}>{item}</option>)}</select>
-              <input className="dataset-edit-detail" value={corpusSizeDetail} onChange={(event) => setCorpusSizeDetail(event.target.value)} placeholder="请填写具体语料条数如1000" />
+              <input type="number" min="0" step="any" value={corpusSize} onChange={(event) => setCorpusSize(event.target.value)} placeholder="请输入具体语料条数" />
+              <i className="size-unit">万条</i>
             </div>
           </div>
           <div className="dataset-edit-field dataset-edit-cell">
             <span>存储容量 *</span>
             <div className="dataset-edit-controls">
-              <select value={storageSize} onChange={(event) => setStorageSize(event.target.value)}><option value="">请选择</option>{['<500GB', '500GB-1TB', '1-2TB', '>2TB'].map((item) => <option key={item}>{item}</option>)}</select>
-              <input className="dataset-edit-detail" value={storageSizeDetail} onChange={(event) => setStorageSizeDetail(event.target.value)} placeholder="请填写具体语料规模如15GB" />
+              <input type="number" min="0" step="any" value={storageSize} onChange={(event) => setStorageSize(event.target.value)} placeholder="请输入存储容量" />
+              <i className="size-unit">GB</i>
             </div>
           </div>
           <label className="dataset-edit-field"><span>对外供给情况 *</span><select value={supplyStatus} onChange={(event) => setSupplyStatus(event.target.value)}><option value="">请选择</option>{['部分提供公开检索服务', '提供对外供给服务', '提供公开检索服务', '无对外供给', '依申请开放', '已公开提供'].map((item) => <option key={item}>{item}</option>)}</select></label>

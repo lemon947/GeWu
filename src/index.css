@@ -22157,3 +22157,23 @@ body {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* Numeric size inputs with fixed units */
+.size-unit {
+  min-height: 44px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  color: #52647c;
+  background: #f2f5f9;
+  border: 1px solid #d6e3ef;
+  border-radius: 8px;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.upload-subject-custom {
+  margin-top: 10px;
+}
