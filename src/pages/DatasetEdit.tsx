@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router'
 import { ArrowLeft, ArrowUpFromLine, Check, Copy, FileArchive, FileText, FolderUp, Github, Link2, Plus, Trash2, X } from 'lucide-react'
 import { corpusRecords } from './CorpusSearch'
 import { provinces, pkuDepartments, subjectChildren, subjects, universities } from './CorpusUpload'
+import { isValidYearRange, PositiveDecimalInput, YearRangeSelect } from '../components/CorpusFormFields'
 
 type Author = { name: string; contact: string; organization: string }
 type SelectedFile = { id: string; name: string; size: number }
@@ -129,7 +130,9 @@ export default function DatasetEdit() {
   const [orgTagInput, setOrgTagInput] = useState('')
   const [province, setProvince] = useState('')
   const [corpusSize, setCorpusSize] = useState('')
+  const [corpusSizeUnit, setCorpusSizeUnit] = useState('万条')
   const [storageSize, setStorageSize] = useState('')
+  const [storageSizeUnit, setStorageSizeUnit] = useState('GB')
   const [supplyStatus, setSupplyStatus] = useState(item.openness === '依申请开放' || item.openness === '定向开放' ? '依申请开放' : '已公开提供')
   const [supplyMode, setSupplyMode] = useState('开源')
   const [license, setLicense] = useState('CC BY 4.0 保留作者署名')
@@ -137,7 +140,7 @@ export default function DatasetEdit() {
   const [language, setLanguage] = useState(item.subject === '数学' || item.subject === '物理' ? '中文/英文' : '中文')
   const [languageCustom, setLanguageCustom] = useState('')
   const [format, setFormat] = useState(item.subject === '化学' ? '反应SMARTS + 结构化文本' : item.subject === '地理' || item.subject === '天文' ? 'CSV、JSON、XML、API接口' : 'CSV / JSON / SQL')
-  const [timeSpan, setTimeSpan] = useState(item.subject === '数学' ? '2000年-至今' : '2020年-至今')
+  const [timeSpan, setTimeSpan] = useState(`${item.subject === '数学' ? '2000' : '2020'}年-${new Date().getFullYear()}年`)
   const [sampleUpload, setSampleUpload] = useState<UploadSectionState>(emptyUploadSection)
   const [allUpload, setAllUpload] = useState<UploadSectionState>(emptyUploadSection)
   const [remark, setRemark] = useState('')
@@ -195,8 +198,12 @@ export default function DatasetEdit() {
       flashToast('请填写学科领域')
       return
     }
-    if (!corpusSize.trim() || !storageSize.trim()) {
-      flashToast('请填写语料规模（万条）与存储容量（GB）')
+    if (![corpusSize, storageSize].every((value) => value.trim() && Number.isFinite(Number(value)) && Number(value) > 0)) {
+      flashToast('语料规模与存储容量必须为大于 0 的数值')
+      return
+    }
+    if (!isValidYearRange(timeSpan)) {
+      flashToast('请选择有效的起止年份，结束年份不能早于起始年份')
       return
     }
     if (language === '其他' && !languageCustom.trim()) {
@@ -271,11 +278,11 @@ export default function DatasetEdit() {
 
         <div className="dataset-edit-grid">
           <label className="dataset-edit-field"><span>学科领域 *</span>
-            <select value={subject} onChange={(event) => setSubject(event.target.value)}>
+            <select required value={subject} onChange={(event) => setSubject(event.target.value)}>
               {subjects.map((name) => (
                 <Fragment key={name}>
                   <option value={name}>{name}</option>
-                  {(subjectChildren[name] ?? []).map((child) => <option value={`${name}·${child}`} key={child}>{`　　${child}`}</option>)}
+                  {(subjectChildren[name] ?? []).map((child) => <option value={`${name}·${child}`} key={child}>{`${'　　'.repeat(child.split('·').length)}${child.split('·').at(-1)}`}</option>)}
                 </Fragment>
               ))}
               <option value="其他">其他</option>
@@ -290,7 +297,7 @@ export default function DatasetEdit() {
             <label className="dataset-edit-field"><span>其他语种类别 *</span><input value={languageCustom} onChange={(event) => setLanguageCustom(event.target.value)} placeholder="请填写语种类别" /></label>
           )}
           <label className="dataset-edit-field"><span>语料格式 *</span><input value={format} onChange={(event) => setFormat(event.target.value)} placeholder="如 CSV / JSON / SQL" /></label>
-          <label className="dataset-edit-field"><span>时间跨度 *</span><input value={timeSpan} onChange={(event) => setTimeSpan(event.target.value)} placeholder="如 2000年-至今" /></label>
+          <div className="dataset-edit-field"><span>时间跨度 *</span><YearRangeSelect value={timeSpan} onChange={setTimeSpan} /></div>
         </div>
 
         <div className="dataset-edit-grid">
@@ -322,15 +329,15 @@ export default function DatasetEdit() {
           <div className="dataset-edit-field dataset-edit-cell">
             <span>语料规模 *</span>
             <div className="dataset-edit-controls">
-              <input type="number" min="0" step="any" value={corpusSize} onChange={(event) => setCorpusSize(event.target.value)} placeholder="请输入具体语料条数" />
-              <i className="size-unit">万条</i>
+              <PositiveDecimalInput label="语料规模" value={corpusSize} onChange={setCorpusSize} />
+              <select className="corpus-unit-select" aria-label="语料规模单位" value={corpusSizeUnit} onChange={(event) => setCorpusSizeUnit(event.target.value)}><option>千条</option><option>万条</option></select>
             </div>
           </div>
           <div className="dataset-edit-field dataset-edit-cell">
             <span>存储容量 *</span>
             <div className="dataset-edit-controls">
-              <input type="number" min="0" step="any" value={storageSize} onChange={(event) => setStorageSize(event.target.value)} placeholder="请输入存储容量" />
-              <i className="size-unit">GB</i>
+              <PositiveDecimalInput label="存储容量" value={storageSize} onChange={setStorageSize} />
+              <select className="corpus-unit-select" aria-label="存储容量单位" value={storageSizeUnit} onChange={(event) => setStorageSizeUnit(event.target.value)}>{['KB', 'MB', 'GB', 'PB'].map((unit) => <option key={unit}>{unit}</option>)}</select>
             </div>
           </div>
           <label className="dataset-edit-field"><span>对外供给情况 *</span><select value={supplyStatus} onChange={(event) => setSupplyStatus(event.target.value)}><option value="">请选择</option>{['部分提供公开检索服务', '提供对外供给服务', '提供公开检索服务', '无对外供给', '依申请开放', '已公开提供'].map((item) => <option key={item}>{item}</option>)}</select></label>

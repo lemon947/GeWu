@@ -22177,3 +22177,23 @@ body {
 .upload-subject-custom {
   margin-top: 10px;
 }
+
+.corpus-year-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.corpus-year-range select {
+  width: 100%;
+  min-width: 0;
+}
+
+.upload-size-controls .corpus-unit-select,
+.dataset-edit-controls .corpus-unit-select {
+  flex: 0 0 90px;
+  width: 90px;
+  min-width: 0;
+}

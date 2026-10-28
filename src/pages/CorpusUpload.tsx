@@ -20,6 +20,7 @@ import {
 import { Link, useSearchParams } from 'react-router'
 import { useApp } from '../context/app-context'
 import { corpusRecords } from './CorpusSearch'
+import { isValidYearRange, PositiveDecimalInput, YearRangeSelect } from '../components/CorpusFormFields'
 
 type Author = { name: string; contact: string; organization: string }
 type UploadGroupKey = 'sample' | 'public' | 'all'
@@ -28,8 +29,8 @@ type UploadGroupState = { mode: 'local' | 'link' | 'cli'; files: string[]; link:
 export const subjects = ['数学', '物理', '化学', '天文', '地理', '生物']
 export const subjectChildren: Record<string, string[]> = {
   化学: ['碳材料', 'f族元素', '生物医药', '能源材料', '催化', '教育教学'],
-  地理: ['地球世界模型', '地表环境与城市', '教育教学'],
-  生物: ['生命', '医学'],
+  地理: ['地理学科', '地理学科·地球世界模型', '地理学科·地表环境与城市', '教育教学'],
+  生物: ['生命', '生命·DNA', '生命·RNA', '生命·多模态生物医药', '生命·多模态跨物种细胞', '生命·中国肿瘤基因库', '生命·作物多模态', '生命·生态学', '医学', '医学·药学', '医学·医学'],
 }
 export const universities = ['北京大学', '清华大学', '复旦大学', '上海交通大学', '南京大学', '武汉大学', '厦门大学', '其他']
 export const pkuDepartments = ['数学科学学院', '物理学院', '物理学院大气与海洋科学系', '物理学院技术物理系', '物理学院现代光学研究所', '物理学院电子显微镜专业实验室', '化学与分子工程学院', '地球与空间科学学院', '材料科学与工程学院', '生命科学学院', '现代农学院', '基础医学院', '药学院', '药学院天然药物及仿生药物全国重点实验室', '公共卫生学院', '人工智能研究院', '定量生物学中心', '生物医学前沿创新中心', '健康医疗大数据国家研究院', '核糖核酸北京研究中心', '国际机器学习研究中心', '北京国际数学研究中心', '遥感与地理信息系统研究所', '科维理天文与天体物理研究所', '国际癌症研究院', '肿瘤医院', '第一医院肾内科', '鄞州数智健康联合研究院', '深圳研究生院新材料学院', '其他']
@@ -59,7 +60,9 @@ type UploadDraftData = {
   timeSpan: string
   province: string
   corpusSize: string
+  corpusSizeUnit?: string
   storageSize: string
+  storageSizeUnit?: string
   supplyStatus: string
   supplyMode: string
   license: string
@@ -179,7 +182,9 @@ export default function CorpusUpload() {
   const [timeSpan, setTimeSpan] = useState('')
   const [province, setProvince] = useState('')
   const [corpusSize, setCorpusSize] = useState('')
+  const [corpusSizeUnit, setCorpusSizeUnit] = useState('万条')
   const [storageSize, setStorageSize] = useState('')
+  const [storageSizeUnit, setStorageSizeUnit] = useState('GB')
   const [supplyStatus, setSupplyStatus] = useState('')
   const [supplyMode, setSupplyMode] = useState('')
   const [license, setLicense] = useState('')
@@ -235,7 +240,7 @@ export default function CorpusUpload() {
       id,
       savedAt: draftStamp(),
       step,
-      data: { taskName, authors, corpusName, introduction, keywords, dataSource, subject, subjectCustom, corpusType, orgType, organization, customOrganization, orgTags, language, languageCustom, format, timeSpan, province, corpusSize, storageSize, supplyStatus, supplyMode, license, openness, uploads },
+      data: { taskName, authors, corpusName, introduction, keywords, dataSource, subject, subjectCustom, corpusType, orgType, organization, customOrganization, orgTags, language, languageCustom, format, timeSpan, province, corpusSize, corpusSizeUnit, storageSize, storageSizeUnit, supplyStatus, supplyMode, license, openness, uploads },
     }
     const next = [record, ...loadDraftList(user.account).filter((item) => item.id !== id)]
     persistDraftList(user.account, next)
@@ -263,10 +268,12 @@ export default function CorpusUpload() {
     setLanguage(data.language === '其他' ? '' : data.language ?? '')
     setLanguageCustom(data.languageCustom ?? '')
     setFormat(data.format ?? '')
-    setTimeSpan(data.timeSpan ?? '')
+    setTimeSpan((data.timeSpan ?? '').replace('至今', `${new Date().getFullYear()}年`))
     setProvince(data.province)
     setCorpusSize(data.corpusSize)
+    setCorpusSizeUnit(data.corpusSizeUnit ?? '万条')
     setStorageSize(data.storageSize)
+    setStorageSizeUnit(data.storageSizeUnit ?? 'GB')
     setSupplyStatus(data.supplyStatus)
     setSupplyMode(data.supplyMode)
     setLicense(data.license)
@@ -300,14 +307,14 @@ export default function CorpusUpload() {
     if (!taskName.trim()) return notify('请填写任务名称')
     if (!subject) return notify('请选择学科领域')
     if (subject === '其他' && !subjectCustom.trim()) return notify('请填写学科领域')
-    if (!corpusSize.trim()) return notify('请填写语料规模（万条）')
-    if (!Number.isFinite(Number(corpusSize)) || Number(corpusSize) <= 0) return notify('语料规模必须为大于 0 的数值（万条）')
-    if (!storageSize.trim()) return notify('请填写存储容量（GB）')
-    if (!Number.isFinite(Number(storageSize)) || Number(storageSize) <= 0) return notify('存储容量必须为大于 0 的数值（GB）')
+    if (!corpusSize.trim()) return notify('请填写语料规模')
+    if (!Number.isFinite(Number(corpusSize)) || Number(corpusSize) <= 0) return notify('语料规模必须为大于 0 的数值')
+    if (!storageSize.trim()) return notify('请填写存储容量')
+    if (!Number.isFinite(Number(storageSize)) || Number(storageSize) <= 0) return notify('存储容量必须为大于 0 的数值')
     if (!keywords.length) return notify('请至少添加一个语料库关键词')
     if (!language) return notify('请选择语种类别')
     if (!format.trim()) return notify('请填写语料格式')
-    if (!timeSpan.trim()) return notify('请填写时间跨度')
+    if (!isValidYearRange(timeSpan)) return notify('请选择有效的起止年份，结束年份不能早于起始年份')
     if (orgType === '高校') {
       if (!organization) return notify('请选择发布机构')
       if ((organization === '其他' || organization === '北京大学·其他') && !customOrganization.trim()) return notify('请填写机构名称')
@@ -398,7 +405,7 @@ export default function CorpusUpload() {
                       {subjects.map((name) => (
                         <Fragment key={name}>
                           <option value={name}>{name}</option>
-                          {(subjectChildren[name] ?? []).map((child) => <option value={`${name}·${child}`} key={child}>{`　　${child}`}</option>)}
+                          {(subjectChildren[name] ?? []).map((child) => <option value={`${name}·${child}`} key={child}>{`${'　　'.repeat(child.split('·').length)}${child.split('·').at(-1)}`}</option>)}
                         </Fragment>
                       ))}
                       <option value="其他">其他</option>
@@ -412,7 +419,7 @@ export default function CorpusUpload() {
                   <div className="upload-field-grid">
                     <label><span>语种类别 *</span><select required value={language} onChange={(event) => setLanguage(event.target.value)}><option value="">请选择</option><option>中文/英文</option><option>中文</option><option>英文</option></select></label>
                     <label><span>语料格式 *</span><input required value={format} onChange={(event) => setFormat(event.target.value)} placeholder="如 CSV / JSON / SQL" /></label>
-                    <label><span>时间跨度 *</span><input required value={timeSpan} onChange={(event) => setTimeSpan(event.target.value)} placeholder="如 2000年-至今" /></label>
+                    <div className="upload-size-cell"><span>时间跨度 *</span><YearRangeSelect value={timeSpan} onChange={setTimeSpan} /></div>
                   </div>
 
                   <div className="upload-field-grid compact-grid">
@@ -441,8 +448,8 @@ export default function CorpusUpload() {
                       </div>
                     )}
                     <label><span>发布机构所在省份 *</span><select required value={province} onChange={(event) => setProvince(event.target.value)}><option value="">请选择省份</option>{provinces.map((item) => <option key={item}>{item}</option>)}</select></label>
-                    <label className="upload-size-cell"><span>语料规模 *</span><div className="upload-size-controls"><input type="number" min="0" step="any" required value={corpusSize} onChange={(event) => { setCorpusSize(event.target.value); event.target.setCustomValidity(event.target.value && (!Number.isFinite(event.target.valueAsNumber) || event.target.valueAsNumber <= 0) ? '语料规模必须为大于 0 的数值' : '') }} placeholder="请输入大于 0 的数值" /><i className="size-unit">万条</i></div></label>
-                    <label className="upload-size-cell"><span>存储容量 *</span><div className="upload-size-controls"><input type="number" min="0" step="any" required value={storageSize} onChange={(event) => { setStorageSize(event.target.value); event.target.setCustomValidity(event.target.value && (!Number.isFinite(event.target.valueAsNumber) || event.target.valueAsNumber <= 0) ? '存储容量必须为大于 0 的数值' : '') }} placeholder="请输入大于 0 的数值" /><i className="size-unit">GB</i></div></label>
+                    <div className="upload-size-cell"><span>语料规模 *</span><div className="upload-size-controls"><PositiveDecimalInput label="语料规模" value={corpusSize} onChange={setCorpusSize} /><select className="corpus-unit-select" aria-label="语料规模单位" value={corpusSizeUnit} onChange={(event) => setCorpusSizeUnit(event.target.value)}><option>千条</option><option>万条</option></select></div></div>
+                    <div className="upload-size-cell"><span>存储容量 *</span><div className="upload-size-controls"><PositiveDecimalInput label="存储容量" value={storageSize} onChange={setStorageSize} /><select className="corpus-unit-select" aria-label="存储容量单位" value={storageSizeUnit} onChange={(event) => setStorageSizeUnit(event.target.value)}>{['KB', 'MB', 'GB', 'PB'].map((unit) => <option key={unit}>{unit}</option>)}</select></div></div>
                     <label><span>对外供给情况 *</span><select required value={supplyStatus} onChange={(event) => setSupplyStatus(event.target.value)}><option value="">请选择</option>{['部分提供公开检索服务', '提供对外供给服务', '提供公开检索服务', '无对外供给', '依申请开放', '已公开提供'].map((item) => <option key={item}>{item}</option>)}</select></label>
                     <label><span>供给方式 *</span><select required value={supplyMode} onChange={(event) => setSupplyMode(event.target.value)}><option value="">请选择</option><option>开源</option><option>闭源</option><option>定向</option></select></label>
                   </div>
@@ -468,7 +475,7 @@ export default function CorpusUpload() {
               <div>
                 <header className="upload-form-title"><div><span>第三步</span><h2>确认信息</h2></div><p>请核对以下内容，确认无误后提交审核</p></header>
                 <section className="upload-confirm-section"><h3>作者信息</h3>{authors.map((author, index) => <div className="confirm-author" key={index}><strong>{author.name}</strong><span>{author.contact}</span><span>{author.organization}</span></div>)}</section>
-                <section className="upload-confirm-section"><h3>语料库信息</h3><dl><div><dt>语料库名称</dt><dd>{corpusName}</dd></div><div><dt>语料库关键词</dt><dd>{keywords.join('、')}</dd></div><div className="is-wide"><dt>语料库介绍</dt><dd>{introduction}</dd></div><div className="is-wide"><dt>主要数据来源</dt><dd>{dataSource}</dd></div><div><dt>学科领域</dt><dd>{subject === '其他' ? subjectCustom : subject}</dd></div><div><dt>语料类型</dt><dd>{corpusType}</dd></div><div><dt>语种类别</dt><dd>{language === '其他' ? languageCustom : language}</dd></div><div><dt>语料格式</dt><dd>{format}</dd></div><div><dt>时间跨度</dt><dd>{timeSpan}</dd></div><div><dt>发布机构</dt><dd>{effectiveOrganization}</dd></div><div><dt>所在省份</dt><dd>{province}</dd></div><div><dt>语料规模</dt><dd>{corpusSize} 万条</dd></div><div><dt>存储容量</dt><dd>{storageSize} GB</dd></div><div><dt>对外供给</dt><dd>{supplyStatus}</dd></div><div><dt>供给方式</dt><dd>{supplyMode}</dd></div></dl></section>
+                <section className="upload-confirm-section"><h3>语料库信息</h3><dl><div><dt>语料库名称</dt><dd>{corpusName}</dd></div><div><dt>语料库关键词</dt><dd>{keywords.join('、')}</dd></div><div className="is-wide"><dt>语料库介绍</dt><dd>{introduction}</dd></div><div className="is-wide"><dt>主要数据来源</dt><dd>{dataSource}</dd></div><div><dt>学科领域</dt><dd>{subject === '其他' ? subjectCustom : subject}</dd></div><div><dt>语料类型</dt><dd>{corpusType}</dd></div><div><dt>语种类别</dt><dd>{language === '其他' ? languageCustom : language}</dd></div><div><dt>语料格式</dt><dd>{format}</dd></div><div><dt>时间跨度</dt><dd>{timeSpan}</dd></div><div><dt>发布机构</dt><dd>{effectiveOrganization}</dd></div><div><dt>所在省份</dt><dd>{province}</dd></div><div><dt>语料规模</dt><dd>{Number(corpusSize).toFixed(1)} {corpusSizeUnit}</dd></div><div><dt>存储容量</dt><dd>{Number(storageSize).toFixed(1)} {storageSizeUnit}</dd></div><div><dt>对外供给</dt><dd>{supplyStatus}</dd></div><div><dt>供给方式</dt><dd>{supplyMode}</dd></div></dl></section>
                 <section className="upload-confirm-section"><h3>文件与开放信息</h3><dl><div><dt>许可协议</dt><dd>{license}</dd></div><div><dt>开放程度</dt><dd>{openness}</dd></div><div><dt>示例数据</dt><dd>{groupLabel(uploads.sample)}</dd></div><div><dt>全部数据</dt><dd>{groupLabel(uploads.all)}</dd></div></dl></section>
                 <div className="upload-form-actions"><button type="button" onClick={() => saveDraft()}><Save size={16} />保存</button><button type="button" onClick={() => setStep(2)}>上一步</button><button type="button" className="is-primary" onClick={submitReview}>提交审核</button></div>
               </div>
